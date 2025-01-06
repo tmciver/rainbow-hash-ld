@@ -71,7 +71,8 @@ library
     -- Other library packages from which modules are imported.
     build-depends:    base,
                       protolude,
-                      url
+                      url,
+                      time
 
     -- Directories containing source files.
     hs-source-dirs:   lib

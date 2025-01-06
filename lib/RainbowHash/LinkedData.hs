@@ -2,6 +2,7 @@ module RainbowHash.LinkedData where
 
 import Protolude
 
+import Data.Time.Clock (UTCTime)
 import Network.URL (URL)
 
 type MediaTypeName = Text
@@ -15,20 +16,27 @@ class FilePut m v where
   putFileInStore :: v -> m URL
 
 class MetadataPut m where
-  putFileMetadata :: URL -> MediaType -> m URL
+  putFileMetadata :: URL -> UTCTime -> MediaType -> m URL
 
 class Monad m => MediaTypeDiscover m v where
   getMediaType :: v -> m MediaType
+
+class Time m where
+  getCurrentTime :: m UTCTime
 
 putFile
   :: ( FilePut m v
      , MetadataPut m
      , MediaTypeDiscover m v
+     , Time m
      )
   => v
   -> Maybe MediaType
   -> m URL
 putFile v maybeMT = do
+
+  -- Get the current time
+  t <- getCurrentTime
 
   -- Use given media type or discover what it is.
   mt <- case maybeMT of
@@ -39,4 +47,4 @@ putFile v maybeMT = do
   blobUrl <- putFileInStore v
 
   -- Add the metadata to the linked data store.
-  putFileMetadata blobUrl mt
+  putFileMetadata blobUrl t mt
