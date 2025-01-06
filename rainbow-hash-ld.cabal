@@ -59,7 +59,8 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  MyLib
+    exposed-modules: MyLib
+                     RainbowHash.LinkedData
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -68,7 +69,9 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.2.1
+    build-depends:    base,
+                      protolude,
+                      url
 
     -- Directories containing source files.
     hs-source-dirs:   lib
@@ -91,7 +94,7 @@ executable rainbow-hash-ld
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.17.2.1,
+        base,
         rainbow-hash-ld
 
     -- Directories containing source files.
@@ -124,5 +127,5 @@ test-suite rainbow-hash-ld-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.17.2.1,
+        base,
         rainbow-hash-ld
