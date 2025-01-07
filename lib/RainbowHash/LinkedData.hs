@@ -1,4 +1,13 @@
-module RainbowHash.LinkedData where
+module RainbowHash.LinkedData
+  ( putFile
+  , FilePut(..)
+  , MetadataPut(..)
+  , MediaTypeDiscover(..)
+  , Time(..)
+  , MediaTypeName
+  , CharSet
+  , MediaType(..)
+  ) where
 
 import Protolude
 
@@ -12,16 +21,16 @@ data MediaType = MediaType
   , mediaTypeCharSet :: CharSet
   } deriving (Eq, Ord, Show, Generic)
 
-class FilePut m v where
+class Monad m => FilePut m v where
   putFileInStore :: v -> m URL
 
-class MetadataPut m where
+class Monad m => MetadataPut m where
   putFileMetadata :: URL -> UTCTime -> MediaType -> m URL
 
 class Monad m => MediaTypeDiscover m v where
   getMediaType :: v -> m MediaType
 
-class Time m where
+class Monad m => Time m where
   getCurrentTime :: m UTCTime
 
 putFile

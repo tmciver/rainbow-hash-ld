@@ -61,6 +61,7 @@ library
     -- Modules exported by the library.
     exposed-modules: MyLib
                      RainbowHash.LinkedData
+                     RainbowHash.App
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -96,7 +97,8 @@ executable rainbow-hash-ld
     -- Other library packages from which modules are imported.
     build-depends:
         base,
-        rainbow-hash-ld
+        rainbow-hash-ld,
+        protolude
 
     -- Directories containing source files.
     hs-source-dirs:   app
