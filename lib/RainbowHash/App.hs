@@ -5,6 +5,7 @@ module RainbowHash.App where
 
 import Protolude
 
+import Control.Monad.Logger (MonadLogger(..), toLogStr, fromLogStr)
 import Data.Maybe (fromJust)
 import qualified Data.Time.Clock as Time
 import Network.URL (importURL)
@@ -19,7 +20,7 @@ runApp (AppM x) = x
 
 instance FilePut AppM FilePath where
   putFileInStore fp = do
-    putStrLn $ "Putting " <> fp <> " in the store."
+    --putStrLn $ "Putting " <> fp <> " in the store."
     fp
       & ("file://" <>)
       & importURL
@@ -28,7 +29,7 @@ instance FilePut AppM FilePath where
 
 instance MetadataPut AppM where
   putFileMetadata url _ _ = do
-    putStrLn ("Putting file metadata." :: Text)
+    --putStrLn ("Putting file metadata." :: Text)
     pure url
 
 instance MediaTypeDiscover AppM FilePath where
@@ -38,5 +39,8 @@ instance MediaTypeDiscover AppM FilePath where
 
 instance Time AppM where
   getCurrentTime = do
-    putStrLn ("Getting current time." :: Text)
+    --putStrLn ("Getting current time." :: Text)
     liftIO Time.getCurrentTime
+
+instance MonadLogger AppM where
+  monadLoggerLog _ _ _ = liftIO . putStrLn . fromLogStr . toLogStr

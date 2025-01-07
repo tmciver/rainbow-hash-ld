@@ -73,7 +73,8 @@ library
     build-depends:    base,
                       protolude,
                       url,
-                      time
+                      time,
+                      monad-logger
 
     -- Directories containing source files.
     hs-source-dirs:   lib
@@ -98,7 +99,8 @@ executable rainbow-hash-ld
     build-depends:
         base,
         rainbow-hash-ld,
-        protolude
+        protolude,
+        monad-logger
 
     -- Directories containing source files.
     hs-source-dirs:   app
