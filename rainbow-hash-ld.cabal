@@ -71,10 +71,11 @@ library
 
     -- Other library packages from which modules are imported.
     build-depends:    base,
+                      monad-logger,
                       protolude,
-                      url,
                       time,
-                      monad-logger
+                      url,
+                      transformers
 
     -- Directories containing source files.
     hs-source-dirs:   lib
@@ -98,9 +99,10 @@ executable rainbow-hash-ld
     -- Other library packages from which modules are imported.
     build-depends:
         base,
-        rainbow-hash-ld,
+        monad-logger,
         protolude,
-        monad-logger
+        rainbow-hash-ld,
+        url
 
     -- Directories containing source files.
     hs-source-dirs:   app

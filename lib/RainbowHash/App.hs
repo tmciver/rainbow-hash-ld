@@ -6,21 +6,25 @@ module RainbowHash.App where
 import Protolude
 
 import Control.Monad.Logger (MonadLogger(..), toLogStr, fromLogStr)
+--import Control.Monad.Trans.Reader (ReaderT)
 import Data.Maybe (fromJust)
 import qualified Data.Time.Clock as Time
-import Network.URL (importURL)
+import Network.URL (importURL, URL)
 
 import RainbowHash.LinkedData
 
-newtype AppM a = AppM (IO a)
-  deriving (Functor, Applicative, Monad, MonadIO)
+newtype Env = Env { blobStoreUrl :: URL }
 
-runApp :: AppM a -> IO a
-runApp (AppM x) = x
+newtype AppM a = AppM (ReaderT Env IO a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Env)
+
+runApp :: AppM a -> Env -> IO a
+runApp (AppM rdr) env = runReaderT rdr env
 
 instance FilePut AppM FilePath where
   putFileInStore fp = do
-    --putStrLn $ "Putting " <> fp <> " in the store."
+    blobStoreUrl' <- asks blobStoreUrl
+    putStrLn $ "Putting " <> fp <> " in the store at " <> show blobStoreUrl'
     fp
       & ("file://" <>)
       & importURL
