@@ -9,7 +9,7 @@ import Data.Maybe (fromJust)
 import Network.URL (importURL, URL)
 
 import RainbowHash.LinkedData (putFile, MediaType(..))
-import RainbowHash.App (runApp, Env(..))
+import RainbowHash.App (runApp, appErrorToString, Env(..))
 
 main :: IO ()
 main = do
@@ -21,6 +21,9 @@ main = do
       blobStorageUrl = "http://localhost:3030/blobs" & importURL & fromJust
       env :: Env
       env = Env blobStorageUrl
-  putStrLn $ "Putting file " <> file <> " in store."
+  --putStrLn $ "Putting file " <> file <> " in store."
 
-  void $ runApp (putFile file mediaType) env
+  either' <- runApp (putFile file mediaType) env
+  case either' of
+    Left e -> putStrLn $ appErrorToString e
+    Right _ -> pure ()

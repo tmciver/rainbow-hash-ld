@@ -1,35 +1,41 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module RainbowHash.App where
+module RainbowHash.App
+  ( AppM
+  , AppError(..)
+  , Env(..)
+  , runApp
+  , appErrorToString
+  ) where
 
 import Protolude
 
 import Control.Monad.Logger (MonadLogger(..), toLogStr, fromLogStr)
---import Control.Monad.Trans.Reader (ReaderT)
-import Data.Maybe (fromJust)
 import qualified Data.Time.Clock as Time
-import Network.URL (importURL, URL)
+import Network.URL (URL)
 
 import RainbowHash.LinkedData
+import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, HTTPClientError)
 
 newtype Env = Env { blobStoreUrl :: URL }
 
-newtype AppM a = AppM (ReaderT Env IO a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Env)
+newtype AppError = HTTPClientError HTTPClientError
+  deriving (Show)
 
-runApp :: AppM a -> Env -> IO a
-runApp (AppM rdr) env = runReaderT rdr env
+appErrorToString :: AppError -> Text
+appErrorToString (HTTPClientError hce) = httpClientErrorToString hce
+
+newtype AppM a = AppM (ExceptT AppError (ReaderT Env IO) a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Env, MonadError AppError)
+
+runApp :: AppM a -> Env -> IO (Either AppError a)
+runApp (AppM except) = runReaderT (runExceptT except)
 
 instance FilePut AppM FilePath where
   putFileInStore fp = do
     blobStoreUrl' <- asks blobStoreUrl
-    putStrLn $ "Putting " <> fp <> " in the store at " <> show blobStoreUrl'
-    fp
-      & ("file://" <>)
-      & importURL
-      & fromJust
-      & pure
+    mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
   putFileMetadata url _ _ = do

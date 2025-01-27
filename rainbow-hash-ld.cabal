@@ -59,9 +59,7 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules: MyLib
-                     RainbowHash.LinkedData
-                     RainbowHash.App
+    exposed-modules: RainbowHash.LinkedData
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -91,7 +89,8 @@ executable rainbow-hash-ld
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    -- other-modules:
+    other-modules: RainbowHash.App
+                   RainbowHash.HTTPClient
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -99,9 +98,19 @@ executable rainbow-hash-ld
     -- Other library packages from which modules are imported.
     build-depends:
         base,
+        bytestring,
+        http-client,
+        http-types,
         monad-logger,
+        mtl,
         protolude,
         rainbow-hash-ld,
+        servant-client,
+        servant-multipart,
+        servant-multipart-client,
+        servant-server,
+        text,
+        time,
         url
 
     -- Directories containing source files.
