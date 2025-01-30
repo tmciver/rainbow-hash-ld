@@ -17,6 +17,7 @@ import Network.URL (URL)
 
 import RainbowHash.LinkedData
 import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, HTTPClientError)
+import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 
 newtype Env = Env { blobStoreUrl :: URL }
 
@@ -43,9 +44,7 @@ instance MetadataPut AppM where
     pure url
 
 instance MediaTypeDiscover AppM FilePath where
-  getMediaType _ = do
-    putStrLn ("Discovering media type." :: Text)
-    pure $ MediaType "application/octet-stream" ""
+  getMediaType = liftIO . discoverMediaTypeFP
 
 instance Time AppM where
   getCurrentTime = do
