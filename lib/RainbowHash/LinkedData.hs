@@ -18,16 +18,7 @@ import Control.Monad.Logger (MonadLogger(..), logInfoN)
 import Data.Time.Clock (UTCTime)
 import Network.URL (URL, exportURL)
 
-type MediaTypeName = Text
-type CharSet = Text
-data MediaType = MediaType
-  { mediaTypeName :: MediaTypeName
-  , mediaTypeCharSet :: CharSet
-  } deriving (Eq, Ord, Show, Generic)
-
-mediaTypeToText :: MediaType -> Text
-mediaTypeToText (MediaType name "") = name
-mediaTypeToText (MediaType name charSet) = name <> "; charset=" <> charSet
+import RainbowHash.MediaType
 
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URL

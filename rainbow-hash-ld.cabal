@@ -60,6 +60,7 @@ library
 
     -- Modules exported by the library.
     exposed-modules: RainbowHash.LinkedData
+                     RainbowHash.MediaType
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -71,6 +72,7 @@ library
     build-depends:    base,
                       monad-logger,
                       protolude,
+                      text,
                       time,
                       url,
                       transformers
@@ -91,6 +93,7 @@ executable rainbow-hash-ld
     -- Modules included in this executable, other than Main.
     other-modules: RainbowHash.App
                    RainbowHash.HTTPClient
+                   RainbowHash.MediaTypeDiscover
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -101,6 +104,7 @@ executable rainbow-hash-ld
         bytestring,
         http-client,
         http-types,
+        magic,
         monad-logger,
         mtl,
         protolude,
@@ -109,6 +113,7 @@ executable rainbow-hash-ld
         servant-multipart,
         servant-multipart-client,
         servant-server,
+        temporary,
         text,
         time,
         url
