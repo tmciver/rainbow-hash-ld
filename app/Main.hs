@@ -19,8 +19,10 @@ main = do
       mediaType = Just $ MediaType "application/octet-stream" ""
       blobStorageUrl :: URL
       blobStorageUrl = "http://localhost:3030/blobs" & importURL & fromJust
+      sparqlEndpoint :: URL
+      sparqlEndpoint = "http://localhost:3031/sparql" & importURL & fromJust
       env :: Env
-      env = Env blobStorageUrl
+      env = Env blobStorageUrl sparqlEndpoint
   --putStrLn $ "Putting file " <> file <> " in store."
 
   either' <- runApp (putFile file mediaType) env

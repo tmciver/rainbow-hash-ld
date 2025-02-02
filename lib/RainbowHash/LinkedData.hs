@@ -48,9 +48,7 @@ putFile v maybeMT = do
   t <- getCurrentTime
 
   -- Use given media type or discover what it is.
-  mt <- case maybeMT of
-    Just mt' -> pure mt'
-    Nothing -> getMediaType v
+  mt <- maybe (getMediaType v) pure maybeMT
 
   -- Add file to blob store.
   blobUrl <- putFileInStore v

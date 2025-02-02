@@ -19,7 +19,10 @@ import RainbowHash.LinkedData
 import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, HTTPClientError)
 import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 
-newtype Env = Env { blobStoreUrl :: URL }
+data Env = Env
+  { blobStoreUrl :: URL
+  , sparqlEndpoint :: URL
+  }
 
 newtype AppError = HTTPClientError HTTPClientError
   deriving (Show)
