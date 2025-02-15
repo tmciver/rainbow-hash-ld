@@ -16,7 +16,7 @@ import qualified Data.Text.Encoding as T
 import Network.HTTP.Client (Request, Response, parseRequest, newManager, defaultManagerSettings, responseHeaders, httpNoBody, responseStatus)
 import Network.HTTP.Client.MultipartFormData (formDataBody, partFileSource)
 import Network.HTTP.Types (Header, hLocation, Status, statusIsSuccessful)
-import Network.URL (URL, importURL, exportURL)
+import Text.URI (URI, mkURI, render)
 
 data HTTPClientError
   = HeaderError HeaderError
@@ -27,11 +27,11 @@ putFile
   :: ( MonadError HTTPClientError m
      , MonadIO m
      )
-  => URL
+  => URI
   -> FilePath
-  -> m URL
+  -> m URI
 putFile blobStoreUrl fp = do
-  liftIO $ putStrLn $ "Putting " <> fp <> " in the store at " <> exportURL blobStoreUrl
+  liftIO $ putStrLn $ "Putting " <> T.pack fp <> " in the store at " <> render blobStoreUrl
   mgr <- liftIO $ newManager defaultManagerSettings
   req <- liftIO $ mkPutFileRequest blobStoreUrl fp
   resp <- liftIO $ httpNoBody req mgr
@@ -49,21 +49,21 @@ mapError f ex = do
     Left e -> throwError (f e)
     Right v -> pure v
 
-mkPutFileRequest :: URL -> FilePath -> IO Request
+mkPutFileRequest :: URI -> FilePath -> IO Request
 mkPutFileRequest blobStorageUrl fp =
   -- partFileSource sends the filename as part of the payload; no need to send it explicitly.
-  parseRequest ("POST " <> exportURL blobStorageUrl) >>= formDataBody [partFileSource "file" fp]
+  parseRequest (T.unpack $ "POST " <> render blobStorageUrl) >>= formDataBody [partFileSource "file" fp]
 
 data HeaderError
   = HeaderNotFound
   | UTF8DecodeError UnicodeException
-  | URLImportError Text
+  | URIImportError Text
   deriving (Show)
 
 headerErrorToString :: HeaderError -> Text
 headerErrorToString HeaderNotFound = "The Location header was not found."
-headerErrorToString (UTF8DecodeError ue) = "URL decode error: " <> show ue
-headerErrorToString (URLImportError t) = "URL import error: " <> t
+headerErrorToString (UTF8DecodeError ue) = "URI decode error: " <> show ue
+headerErrorToString (URIImportError t) = "URI import error: " <> t
 
 httpClientErrorToString :: HTTPClientError -> Text
 httpClientErrorToString (HeaderError he) = headerErrorToString he
@@ -80,8 +80,8 @@ checkStatus resp = do
 getLocationHeader
   :: MonadError HeaderError m
   => Response a
-  -> m URL
-getLocationHeader = findLocationVal >=> locationToURL
+  -> m URI
+getLocationHeader = findLocationVal >=> locationToURI
   where findLocationVal :: MonadError HeaderError m => Response a -> m ByteString
         findLocationVal resp =
           let maybeHeader = find isLocation . responseHeaders $ resp
@@ -92,11 +92,11 @@ getLocationHeader = findLocationVal >=> locationToURL
         isLocation :: Header -> Bool
         isLocation (hdr, _) = hdr == hLocation
 
-        locationToURL :: MonadError HeaderError m => ByteString -> m URL
-        locationToURL bs = do
+        locationToURI :: MonadError HeaderError m => ByteString -> m URI
+        locationToURI bs = do
           t <- case T.decodeUtf8' bs of
             Right t' -> pure t'
             Left uErr -> throwError $ UTF8DecodeError uErr
-          case importURL . T.unpack $ t of
+          case mkURI t of
             Just url -> pure url
-            Nothing -> throwError $ URLImportError t
+            Nothing -> throwError $ URIImportError t

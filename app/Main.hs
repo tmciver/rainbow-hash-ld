@@ -6,21 +6,23 @@ module Main where
 import Protolude
 
 import Data.Maybe (fromJust)
-import Network.URL (importURL, URL)
+import Text.URI (mkURI, URI)
 
-import RainbowHash.LinkedData (putFile, MediaType(..))
+import RainbowHash.LinkedData (putFile)
+import RainbowHash.MediaType (MediaType(..))
 import RainbowHash.App (runApp, appErrorToString, Env(..))
 
 main :: IO ()
 main = do
   let file :: FilePath
-      file = "/some/file.txt"
+      file = "/home/tim/workspace/haskell/rainbow-hash-ld/default.nix"
       -- mediaType = Nothing
-      mediaType = Just $ MediaType "application/octet-stream" ""
-      blobStorageUrl :: URL
-      blobStorageUrl = "http://localhost:3030/blobs" & importURL & fromJust
-      sparqlEndpoint :: URL
-      sparqlEndpoint = "http://localhost:3031/sparql" & importURL & fromJust
+      --mediaType = Just $ MediaType "application/octet-stream" ""
+      mediaType = Nothing
+      blobStorageUrl :: URI
+      blobStorageUrl = "http://localhost:3030/blobs" & mkURI & fromJust
+      sparqlEndpoint :: URI
+      sparqlEndpoint = "http://localhost:3031/sparql" & mkURI & fromJust
       env :: Env
       env = Env blobStorageUrl sparqlEndpoint
   --putStrLn $ "Putting file " <> file <> " in store."

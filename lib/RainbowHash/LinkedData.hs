@@ -7,24 +7,26 @@ module RainbowHash.LinkedData
   , MetadataPut(..)
   , MediaTypeDiscover(..)
   , Time(..)
-  , MediaTypeName
-  , CharSet
-  , MediaType(..)
   ) where
 
 import Protolude
 
 import Control.Monad.Logger (MonadLogger(..), logInfoN)
 import Data.Time.Clock (UTCTime)
-import Network.URL (URL, exportURL)
+import Text.URI (URI, render)
 
 import RainbowHash.MediaType
 
 class Monad m => FilePut m v where
-  putFileInStore :: v -> m URL
+  putFileInStore :: v -> m URI
 
 class Monad m => MetadataPut m where
-  putFileMetadata :: URL -> UTCTime -> MediaType -> m URL
+  putFileMetadata
+    :: URI -- ^URI of file data in blob storage
+    -> Text -- ^file name
+    -> UTCTime -- ^file creation time
+    -> MediaType
+    -> m URI
 
 class Monad m => MediaTypeDiscover m v where
   getMediaType :: v -> m MediaType
@@ -41,7 +43,7 @@ putFile
      )
   => v
   -> Maybe MediaType
-  -> m URL
+  -> m URI
 putFile v maybeMT = do
 
   -- Get the current time
@@ -54,7 +56,8 @@ putFile v maybeMT = do
   blobUrl <- putFileInStore v
 
   -- Add the metadata to the linked data store.
-  fileUrl <- putFileMetadata blobUrl t mt
+  let fileName = "some-file.txt"
+  fileUrl <- putFileMetadata blobUrl fileName t mt
 
   logPutFile fileUrl blobUrl t mt
 
@@ -62,14 +65,14 @@ putFile v maybeMT = do
 
 logPutFile
   :: MonadLogger m
-  => URL
-  -> URL
+  => URI
+  -> URI
   -> UTCTime
   -> MediaType
   -> m ()
 logPutFile fileUrl blobUrl t mt =
   logInfoN
-    $  "Created file object " <> toS (exportURL fileUrl)
-    <> " with blob URL " <> toS (exportURL blobUrl)
+    $  "Created file object " <> toS (render fileUrl)
+    <> " with blob URI " <> toS (render blobUrl)
     <> " and media type " <> mediaTypeToText mt
     <> " at " <> show t

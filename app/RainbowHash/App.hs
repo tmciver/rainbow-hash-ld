@@ -12,16 +12,18 @@ module RainbowHash.App
 import Protolude
 
 import Control.Monad.Logger (MonadLogger(..), toLogStr, fromLogStr)
+import Data.RDF (writeH, TurtleSerializer(..), TList, RDF)
 import qualified Data.Time.Clock as Time
-import Network.URL (URL)
+import Text.URI (URI)
 
 import RainbowHash.LinkedData
 import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, HTTPClientError)
 import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
+import RainbowHash.RDF4H (fileDataToRDF)
 
 data Env = Env
-  { blobStoreUrl :: URL
-  , sparqlEndpoint :: URL
+  { blobStoreUrl :: URI
+  , sparqlEndpoint :: URI
   }
 
 newtype AppError = HTTPClientError HTTPClientError
@@ -42,8 +44,11 @@ instance FilePut AppM FilePath where
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
-  putFileMetadata url _ _ = do
-    --putStrLn ("Putting file metadata." :: Text)
+  putFileMetadata blobUrl fileName time mt = do
+    (url, rdf) <- liftIO $ fileDataToRDF blobUrl fileName time mt
+    -- print the rdf turtle to stdout
+    let turtleSerializer = TurtleSerializer Nothing mempty
+    liftIO $ writeH turtleSerializer (rdf :: RDF TList)
     pure url
 
 instance MediaTypeDiscover AppM FilePath where

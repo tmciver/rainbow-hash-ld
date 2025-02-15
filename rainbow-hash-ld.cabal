@@ -70,11 +70,11 @@ library
 
     -- Other library packages from which modules are imported.
     build-depends:    base,
+                      modern-uri,
                       monad-logger,
                       protolude,
                       text,
                       time,
-                      url,
                       transformers
 
     -- Directories containing source files.
@@ -94,6 +94,7 @@ executable rainbow-hash-ld
     other-modules: RainbowHash.App
                    RainbowHash.HTTPClient
                    RainbowHash.MediaTypeDiscover
+                   RainbowHash.RDF4H
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -102,13 +103,16 @@ executable rainbow-hash-ld
     build-depends:
         base,
         bytestring,
+        containers,
         http-client,
         http-types,
         magic,
+        modern-uri,
         monad-logger,
         mtl,
         protolude,
         rainbow-hash-ld,
+        rdf4h,
         servant-client,
         servant-multipart,
         servant-multipart-client,
@@ -116,7 +120,7 @@ executable rainbow-hash-ld
         temporary,
         text,
         time,
-        url
+        uuid
 
     -- Directories containing source files.
     hs-source-dirs:   app
