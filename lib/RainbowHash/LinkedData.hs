@@ -6,6 +6,7 @@ module RainbowHash.LinkedData
   , FilePut(..)
   , MetadataPut(..)
   , MediaTypeDiscover(..)
+  , FileNameGet(..)
   , Time(..)
   ) where
 
@@ -23,13 +24,16 @@ class Monad m => FilePut m v where
 class Monad m => MetadataPut m where
   putFileMetadata
     :: URI -- ^URI of file data in blob storage
-    -> Text -- ^file name
+    -> Maybe Text -- ^file name. May be unavailable if client calls putFile on ByteString.
     -> UTCTime -- ^file creation time
     -> MediaType
     -> m URI
 
 class Monad m => MediaTypeDiscover m v where
   getMediaType :: v -> m MediaType
+
+class Monad m => FileNameGet m v where
+  getFileName :: v -> m (Maybe Text)
 
 class Monad m => Time m where
   getCurrentTime :: m UTCTime
@@ -38,13 +42,15 @@ putFile
   :: ( FilePut m v
      , MetadataPut m
      , MediaTypeDiscover m v
+     , FileNameGet m v
      , Time m
      , MonadLogger m
      )
   => v
+  -> Maybe Text -- ^filename
   -> Maybe MediaType
   -> m URI
-putFile v maybeMT = do
+putFile v maybeFileName maybeMT = do
 
   -- Get the current time
   t <- getCurrentTime
@@ -52,12 +58,16 @@ putFile v maybeMT = do
   -- Use given media type or discover what it is.
   mt <- maybe (getMediaType v) pure maybeMT
 
+  -- Use the given filename or get it from v
+  maybeFileName' <- case maybeFileName of
+    Just fn -> pure $ Just fn
+    Nothing -> getFileName v
+
   -- Add file to blob store.
   blobUrl <- putFileInStore v
 
   -- Add the metadata to the linked data store.
-  let fileName = "some-file.txt"
-  fileUrl <- putFileMetadata blobUrl fileName t mt
+  fileUrl <- putFileMetadata blobUrl maybeFileName' t mt
 
   logPutFile fileUrl blobUrl t mt
 

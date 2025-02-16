@@ -17,11 +17,12 @@ main = do
   let file :: FilePath
       file = "/home/tim/workspace/haskell/rainbow-hash-ld/default.nix"
       mediaType = Nothing
+      fileName = Nothing
       --mediaType = Just $ MediaType "application/octet-stream" ""
 
   env <- getEnv
 
-  either' <- runApp (putFile file mediaType) env
+  either' <- runApp (putFile file fileName mediaType) env
   case either' of
     Left e -> putStrLn $ appErrorToString e
     Right _ -> pure ()

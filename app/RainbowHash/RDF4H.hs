@@ -21,13 +21,13 @@ import RainbowHash.MediaType (MediaType, mediaTypeToText)
 fileDataToRDF
   :: (Rdf a)
   => URI
-  -> Text
+  -> Maybe Text -- ^filename
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF blobUrl fileName time mt = do
+fileDataToRDF blobUrl maybeFileName time mt = do
   let baseUrlText :: Text
-      baseUrlText = "http://example.com/data/" 
+      baseUrlText = "http://example.com/data/"
 
   uuid <- nextRandom
   url <- mkURI $ baseUrlText <> toText uuid
@@ -45,12 +45,23 @@ fileDataToRDF blobUrl fileName time mt = do
         & Map.insert "schema" "https://schema.org/"
         & PrefixMappings
 
-      triples = [ triple (unode urlText) (unode "rdf:type") (unode "nfo:FileDataObject")
+      triples = [
+                  -- RDF
+                  triple (unode urlText) (unode "rdf:type") (unode "nfo:FileDataObject")
+
+                -- NEPOMUK File Ontology (nfo)
                 , triple (unode urlText) (unode "nfo:fileUrl") (unode $ render blobUrl)
-                , triple (unode urlText) (unode "nfo:fileName") (unode $ show fileName)
+
                 , triple (unode urlText) (unode "nfo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
+
+                -- Schema.org stuff
                 , triple (unode urlText) (unode "schema:encodingFormat") (unode $ show $ mediaTypeToText mt)
                 ]
+                <>
+                -- conditional triples
+                case maybeFileName of
+                    Just fileName -> [triple (unode urlText) (unode "nfo:fileName") (unode $ show fileName)]
+                    Nothing -> []
 
       rdf = mkRdf triples (Just $ BaseUrl baseUrlText) prefixes
 
