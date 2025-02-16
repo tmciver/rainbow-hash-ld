@@ -44,6 +44,7 @@ fileDataToRDF blobUrl maybeFileName time mt = do
         & Map.insert "nfo" "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#"
         & Map.insert "xsd" "http://www.w3.org/2001/XMLSchema#"
         & Map.insert "schema" "https://schema.org/"
+        & Map.insert "dh" "https://www.w3.org/ns/ldt/document-hierarchy#"
         & PrefixMappings
 
       triples =
@@ -69,6 +70,10 @@ fileDataToRDF blobUrl maybeFileName time mt = do
         case maybeFileName of
           Just fileName -> [triple (unode urlText) (unode "nfo:fileName") (unode $ show fileName)]
           Nothing -> []
+        <>
+
+        -- LDH compatible ontology
+        [ triple (unode urlText) (unode "rdf:type") (unode "dh:Item") ]
         <>
 
         -- Schema.org stuff
