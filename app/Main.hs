@@ -21,9 +21,7 @@ main = do
   env <- getEnv
 
   either' <- runApp (putFile file fileName mediaType) env
-  case either' of
-    Left e -> putStrLn $ appErrorToString e
-    Right _ -> pure ()
+  whenLeft either' (putStrLn . appErrorToString)
 
 getEnv :: IO Env
 getEnv = do
@@ -34,3 +32,7 @@ getEnv = do
       env :: Env
       env = Env blobStorageUrl sparqlEndpoint
   pure env
+
+whenLeft :: Applicative m => Either a b -> (a -> m ()) -> m ()
+whenLeft (Left v) f = f v
+whenLeft _ _ = pure ()
