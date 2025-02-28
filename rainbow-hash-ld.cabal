@@ -104,6 +104,7 @@ executable rainbow-hash-ld
         base,
         bytestring,
         containers,
+        exceptions,
         filepath,
         http-client,
         http-types,
