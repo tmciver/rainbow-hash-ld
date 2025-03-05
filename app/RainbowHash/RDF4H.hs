@@ -29,10 +29,13 @@ fileDataToRDF blobUrl maybeFileName time mt = do
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
 
-  uuid <- nextRandom
-  url <- mkURI $ baseUrlText <> toText uuid
+  fileId <- nextRandom
+  fileUri <- mkURI $ baseUrlText <> toText fileId
+  fileDataId <- nextRandom
+  fileDataUri <- mkURI $ baseUrlText <> toText fileDataId
 
-  let urlText = render url
+  let fileUriText = render fileUri
+      fileDataUriText = render fileDataUri
 
       timeISO8601 :: Text
       timeISO8601 = time & iso8601Show & T.pack & show
@@ -45,40 +48,58 @@ fileDataToRDF blobUrl maybeFileName time mt = do
         & Map.insert "xsd" "http://www.w3.org/2001/XMLSchema#"
         & Map.insert "schema" "https://schema.org/"
         & Map.insert "dh" "https://www.w3.org/ns/ldt/document-hierarchy#"
+        & Map.insert "fo" "http://timmciver.com/file-ontology#"
         & PrefixMappings
 
       triples =
-        -- RDF
-        [triple (unode urlText) (unode "rdf:type") (unode "nfo:FileDataObject")]
-        <>
 
         -- RDFS
         let label = case maybeFileName of
                       Just fileName -> "A file with name \"" <> fileName <> "\""
                       Nothing -> "A file with no name"
         in
-          [ triple (unode urlText) (unode "rdfs:label") (unode $ show label)
-          , triple (unode urlText) (unode "rdfs:comment") (unode $ show label)
+          [ triple (unode fileUriText) (unode "rdfs:label") (unode $ show label)
+          , triple (unode fileUriText) (unode "rdfs:comment") (unode $ show label)
           ]
         <>
 
-        -- NEPOMUK File Ontology (nfo)
-        [ triple (unode urlText) (unode "nfo:fileUrl") (unode $ render blobUrl)
-        , triple (unode urlText) (unode "nfo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
+        -- Create a FileData object. This is similar to a nfo:FileDataObject but
+        -- is meant to represent the immutable state of the file at some point
+        -- in time.
+        [ triple (unode fileDataUriText) (unode "rdf:type") (unode "nfo:FileData")
+        , triple (unode fileDataUriText) (unode "fo:fileContent") (unode $ render blobUrl)
+        , triple (unode fileDataUriText) (unode "fo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
+        , triple (unode fileDataUriText) (unode "fo:mediaType") (unode $ show $ mediaTypeToText mt)
         ]
         <>
+
+        -- Point this file at the above FileData object.
+        [ triple (unode fileUriText) (unode "fo:fileData") (unode fileDataUriText)]
+        <>
+
+        -- NEPOMUK File Ontology (nfo)
+        [ triple (unode fileUriText) (unode "rdf:type") (unode "nfo:FileDataObject")
+        , triple (unode fileUriText) (unode "nfo:fileUri") (unode $ render blobUrl)
+        , triple (unode fileUriText) (unode "nfo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
+        , triple (unode fileUriText) (unode "nfo:fileLastModified") (unode $ timeISO8601 <> "^^xsd:dateTime")
+        ]
+        <>
+
+        -- Add the filename, if we have it.
         case maybeFileName of
-          Just fileName -> [triple (unode urlText) (unode "nfo:fileName") (unode $ show fileName)]
+          Just fileName -> [ triple (unode fileUriText) (unode "nfo:fileName") (unode $ show fileName)
+                           , triple (unode fileDataUriText) (unode "fo:fileName") (unode $ show fileName)
+                           ]
           Nothing -> []
         <>
 
         -- LDH compatible ontology
-        [ triple (unode urlText) (unode "rdf:type") (unode "dh:Item") ]
+        [ triple (unode fileUriText) (unode "rdf:type") (unode "dh:Item") ]
         <>
 
         -- Schema.org stuff
-        [triple (unode urlText) (unode "schema:encodingFormat") (unode $ show $ mediaTypeToText mt)]
+        [triple (unode fileUriText) (unode "schema:encodingFormat") (unode $ show $ mediaTypeToText mt)]
 
       rdf = mkRdf triples (Just $ BaseUrl baseUrlText) prefixes
 
-  pure (url, rdf)
+  pure (fileUri, rdf)
