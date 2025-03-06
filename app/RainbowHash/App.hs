@@ -47,9 +47,9 @@ instance FilePut AppM FilePath where
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
-  putFileMetadata blobUrl maybeFileName time mt = do
+  putFileMetadata blobUrl createdByUri maybeFileName time mt = do
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF blobUrl maybeFileName time mt
+    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF blobUrl createdByUri maybeFileName time mt
 
     -- Post the graph to the SPARQL server via the Graph Store Protocol
     gspUri <- asks sparqlEndpoint

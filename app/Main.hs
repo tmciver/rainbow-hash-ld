@@ -17,10 +17,11 @@ main = do
       file = "/home/tim/workspace/haskell/rainbow-hash-ld/default.nix"
       mediaType = Nothing
       fileName = Nothing
+      agentUri = "http://timmciver.com/me#" & mkURI & fromJust
 
   env <- getEnv
 
-  either' <- runApp (putFile file fileName mediaType) env
+  either' <- runApp (putFile file agentUri fileName mediaType) env
   whenLeft either' (putStrLn . appErrorToString)
 
 getEnv :: IO Env

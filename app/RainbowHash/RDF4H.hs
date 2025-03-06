@@ -20,12 +20,13 @@ import RainbowHash.MediaType (MediaType, mediaTypeToText)
 
 fileDataToRDF
   :: (Rdf a)
-  => URI
+  => URI -- ^URI to the bytes of the file content.
+  -> URI -- ^URI of the agent that created the file.
   -> Maybe Text -- ^filename
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF blobUrl maybeFileName time mt = do
+fileDataToRDF blobUrl createdByUri maybeFileName time mt = do
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
 
@@ -66,26 +67,28 @@ fileDataToRDF blobUrl maybeFileName time mt = do
         -- Create a FileData object. This is similar to a nfo:FileDataObject but
         -- is meant to represent the immutable state of the file at some point
         -- in time.
-        [ triple (unode fileDataUriText) (unode "rdf:type") (unode "nfo:FileData")
+        [ triple (unode fileDataUriText) (unode "rdf:type") (unode "fo:FileData")
         , triple (unode fileDataUriText) (unode "fo:fileContent") (unode $ render blobUrl)
         , triple (unode fileDataUriText) (unode "fo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
+        , triple (unode fileDataUriText) (unode "fo:fileCreatedBy") (unode $ render createdByUri)
         , triple (unode fileDataUriText) (unode "fo:mediaType") (unode $ show $ mediaTypeToText mt)
         ]
         <>
 
         -- Point this file at the above FileData object.
-        [ triple (unode fileUriText) (unode "fo:fileData") (unode fileDataUriText)]
+        [ triple (unode fileUriText) (unode "fo:fileData") (unode fileDataUriText) ]
         <>
 
         -- NEPOMUK File Ontology (nfo)
         [ triple (unode fileUriText) (unode "rdf:type") (unode "nfo:FileDataObject")
+        , triple (unode fileUriText) (unode "nfo:fileOwner") (unode $ render createdByUri)
         , triple (unode fileUriText) (unode "nfo:fileUri") (unode $ render blobUrl)
         , triple (unode fileUriText) (unode "nfo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
         , triple (unode fileUriText) (unode "nfo:fileLastModified") (unode $ timeISO8601 <> "^^xsd:dateTime")
         ]
         <>
 
-        -- Add the filename, if we have it.
+        -- Add some filename triples, if we have it.
         case maybeFileName of
           Just fileName -> [ triple (unode fileUriText) (unode "nfo:fileName") (unode $ show fileName)
                            , triple (unode fileDataUriText) (unode "fo:fileName") (unode $ show fileName)
