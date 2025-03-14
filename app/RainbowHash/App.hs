@@ -4,7 +4,6 @@
 module RainbowHash.App
   ( AppM
   , AppError(..)
-  , Env(..)
   , runApp
   , appErrorToString
   ) where
@@ -17,17 +16,12 @@ import Data.RDF (RDF, TList)
 import qualified Data.Text as T
 import qualified Data.Time.Clock as Time
 import System.FilePath (takeFileName)
-import Text.URI (URI)
 
 import RainbowHash.LinkedData
 import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, postToSPARQL, HTTPClientError)
 import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 import RainbowHash.RDF4H (fileDataToRDF)
-
-data Env = Env
-  { blobStoreUrl :: URI
-  , sparqlEndpoint :: URI
-  }
+import RainbowHash.Config (Config(..))
 
 newtype AppError = HTTPClientError HTTPClientError
   deriving (Show)
@@ -35,10 +29,10 @@ newtype AppError = HTTPClientError HTTPClientError
 appErrorToString :: AppError -> Text
 appErrorToString (HTTPClientError hce) = httpClientErrorToString hce
 
-newtype AppM a = AppM (ExceptT AppError (ReaderT Env IO) a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Env, MonadError AppError, MonadMask, MonadCatch, MonadThrow)
+newtype AppM a = AppM (ExceptT AppError (ReaderT Config IO) a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadError AppError, MonadMask, MonadCatch, MonadThrow)
 
-runApp :: AppM a -> Env -> IO (Either AppError a)
+runApp :: AppM a -> Config -> IO (Either AppError a)
 runApp (AppM except) = runReaderT (runExceptT except)
 
 instance FilePut AppM FilePath where

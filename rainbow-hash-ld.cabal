@@ -92,9 +92,11 @@ executable rainbow-hash-ld
 
     -- Modules included in this executable, other than Main.
     other-modules: RainbowHash.App
+                   RainbowHash.Config
                    RainbowHash.HTTPClient
                    RainbowHash.MediaTypeDiscover
                    RainbowHash.RDF4H
+                   RainbowHash.Server
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -115,6 +117,7 @@ executable rainbow-hash-ld
         protolude,
         rainbow-hash-ld,
         rdf4h,
+        servant,
         servant-client,
         servant-multipart,
         servant-multipart-client,
@@ -122,7 +125,9 @@ executable rainbow-hash-ld
         temporary,
         text,
         time,
-        uuid
+        uuid,
+        wai,
+        warp
 
     -- Directories containing source files.
     hs-source-dirs:   app
