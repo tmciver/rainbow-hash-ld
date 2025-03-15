@@ -14,9 +14,8 @@ import Data.UUID.V4 (nextRandom)
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601Show)
+import Network.HTTP.Media (MediaType, renderHeader)
 import Text.URI (URI, mkURI, render)
-
-import RainbowHash.MediaType (MediaType, mediaTypeToText)
 
 fileDataToRDF
   :: (Rdf a)
@@ -71,7 +70,7 @@ fileDataToRDF blobUrl createdByUri maybeFileName time mt = do
         , triple (unode fileDataUriText) (unode "fo:fileContent") (unode $ render blobUrl)
         , triple (unode fileDataUriText) (unode "fo:fileCreated") (unode $ timeISO8601 <> "^^xsd:dateTime")
         , triple (unode fileDataUriText) (unode "fo:fileCreatedBy") (unode $ render createdByUri)
-        , triple (unode fileDataUriText) (unode "fo:mediaType") (unode $ show $ mediaTypeToText mt)
+        , triple (unode fileDataUriText) (unode "fo:mediaType") (unode $ show $ renderHeader mt)
         ]
         <>
 
@@ -101,7 +100,7 @@ fileDataToRDF blobUrl createdByUri maybeFileName time mt = do
         <>
 
         -- Schema.org stuff
-        [triple (unode fileUriText) (unode "schema:encodingFormat") (unode $ show $ mediaTypeToText mt)]
+        [triple (unode fileUriText) (unode "schema:encodingFormat") (unode $ show $ renderHeader mt)]
 
       rdf = mkRdf triples (Just $ BaseUrl baseUrlText) prefixes
 

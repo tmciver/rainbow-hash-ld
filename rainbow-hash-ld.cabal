@@ -60,7 +60,6 @@ library
 
     -- Modules exported by the library.
     exposed-modules: RainbowHash.LinkedData
-                     RainbowHash.MediaType
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -70,6 +69,7 @@ library
 
     -- Other library packages from which modules are imported.
     build-depends:    base,
+                      http-media,
                       modern-uri,
                       monad-logger,
                       protolude,
@@ -109,6 +109,7 @@ executable rainbow-hash-ld
         exceptions,
         filepath,
         http-client,
+        http-media,
         http-types,
         magic,
         modern-uri,

@@ -8,6 +8,7 @@ import Protolude hiding (Handler)
 
 import qualified Data.ByteString.Lazy as LBS
 import Data.Maybe (fromJust)
+import Network.HTTP.Media (MediaType)
 import Servant hiding (URI)
 import Servant.Multipart
 import Text.URI (URI, mkURI, render)
@@ -15,7 +16,6 @@ import Text.URI (URI, mkURI, render)
 import RainbowHash.App (runApp, appErrorToString, AppError)
 import RainbowHash.Config (getConfig)
 import RainbowHash.LinkedData (putFile)
-import RainbowHash.MediaType (MediaType)
 
 newtype ServantURI = ServantURI { toURI :: URI }
 

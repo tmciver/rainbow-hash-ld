@@ -13,10 +13,10 @@ module RainbowHash.LinkedData
 import Protolude
 
 import Control.Monad.Logger (MonadLogger(..), logInfoN)
+import Data.Text.Encoding as T
 import Data.Time.Clock (UTCTime)
+import Network.HTTP.Media (MediaType, renderHeader)
 import Text.URI (URI, render)
-
-import RainbowHash.MediaType
 
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
@@ -86,5 +86,5 @@ logPutFile fileUrl blobUrl t mt =
   logInfoN
     $  "Created file object " <> toS (render fileUrl)
     <> " with blob URI " <> toS (render blobUrl)
-    <> " and media type " <> mediaTypeToText mt
+    <> " and media type " <> (T.decodeUtf8 $ renderHeader mt)
     <> " at " <> show t
