@@ -16,19 +16,28 @@ import Text.URI (URI, mkURI, render)
 import RainbowHash.App (runApp, appErrorToString, AppError)
 import RainbowHash.Config (getConfig)
 import RainbowHash.LinkedData (putFile)
+import RainbowHash.View.Home (Home(..))
+import RainbowHash.View.HTML (HTML)
 
 newtype ServantURI = ServantURI { toURI :: URI }
 
 instance ToHttpApiData ServantURI where
   toUrlPiece = render . toURI
 
-type FilesAPI = "files" :> MultipartForm Tmp (MultipartData Tmp) :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
+type FilesAPI = Get '[HTML] Home
+           :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
+                        :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
 
 api :: Proxy FilesAPI
 api = Proxy
 
-filesServer :: Server FilesAPI
-filesServer multipartData = do
+homeHandler :: Handler Home
+homeHandler = pure Home
+
+filesHandler
+  :: MultipartData Tmp
+  -> Handler (Headers '[Header "Location" ServantURI] NoContent)
+filesHandler multipartData = do
   case files multipartData of
     [fileData] -> uploadFile fileData
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
@@ -52,5 +61,8 @@ filesServer multipartData = do
         errToLBS :: AppError -> LBS.ByteString
         errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
+server :: Server FilesAPI
+server = homeHandler :<|> filesHandler
+
 app :: Application
-app = serve api filesServer
+app = serve api server

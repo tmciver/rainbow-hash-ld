@@ -97,6 +97,8 @@ executable rainbow-hash-ld
                    RainbowHash.MediaTypeDiscover
                    RainbowHash.RDF4H
                    RainbowHash.Server
+                   RainbowHash.View.Home
+                   RainbowHash.View.HTML
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -111,6 +113,7 @@ executable rainbow-hash-ld
         http-client,
         http-media,
         http-types,
+        lucid,
         magic,
         modern-uri,
         monad-logger,
