@@ -15,7 +15,8 @@ import Text.URI (URI, mkURI, render)
 
 import RainbowHash.App (runApp, appErrorToString, AppError)
 import RainbowHash.Config (getConfig)
-import RainbowHash.LinkedData (putFile)
+import RainbowHash.LinkedData (getRecentFiles, putFile)
+import RainbowHash.View.File (File(..))
 import RainbowHash.View.Home (Home(..))
 import RainbowHash.View.HTML (HTML)
 
@@ -32,7 +33,16 @@ api :: Proxy FilesAPI
 api = Proxy
 
 homeHandler :: Handler Home
-homeHandler = pure Home
+homeHandler = do
+  config <- liftIO getConfig
+  either' <- liftIO $ runApp getRecentFiles config
+  case either' of
+    Left err -> throwError $ err500 { errBody = errToLBS err }
+    Right recentFiles -> pure $ Home (File <$> recentFiles)
+
+  where
+    errToLBS :: AppError -> LBS.ByteString
+    errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
 filesHandler
   :: MultipartData Tmp

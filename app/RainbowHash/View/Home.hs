@@ -7,10 +7,12 @@ import Protolude
 
 import Lucid
 
-data Home = Home
+import RainbowHash.View.File (File(..))
+
+data Home = Home [File]
 
 instance ToHtml Home where
-  toHtml _ = html_ $ do
+  toHtml (Home files) = html_ $ do
     body_ $ do
       form_
        [ method_ "POST"
@@ -20,8 +22,10 @@ instance ToHtml Home where
         div_ $ do
           label_ "Upload a File"
           br_ []
-          input_ [type_ "file", name_ "filename"]
+          input_ [type_ "file", name_ "file"]
         br_ []
         input_ [type_ "submit", value_ "Submit"]
+
+      toHtml files
 
   toHtmlRaw = toHtml

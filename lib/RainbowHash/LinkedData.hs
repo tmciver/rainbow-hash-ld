@@ -4,6 +4,7 @@
 module RainbowHash.LinkedData
   ( putFile
   , FilePut(..)
+  , FileGet(..)
   , MetadataPut(..)
   , MediaTypeDiscover(..)
   , FileNameGet(..)
@@ -18,8 +19,14 @@ import Data.Time.Clock (UTCTime)
 import Network.HTTP.Media (MediaType, renderHeader)
 import Text.URI (URI, render)
 
+import RainbowHash.File (File)
+
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
+
+class Monad m => FileGet m where
+  getFile :: URI -> m (Maybe File)
+  getRecentFiles :: m [File]
 
 class Monad m => MetadataPut m where
   putFileMetadata

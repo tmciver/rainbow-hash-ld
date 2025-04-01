@@ -60,6 +60,7 @@ library
 
     -- Modules exported by the library.
     exposed-modules: RainbowHash.LinkedData
+                     RainbowHash.File
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -97,6 +98,7 @@ executable rainbow-hash-ld
                    RainbowHash.MediaTypeDiscover
                    RainbowHash.RDF4H
                    RainbowHash.Server
+                   RainbowHash.View.File
                    RainbowHash.View.Home
                    RainbowHash.View.HTML
 
@@ -120,6 +122,7 @@ executable rainbow-hash-ld
         mtl,
         protolude,
         rainbow-hash-ld,
+        random,
         rdf4h,
         servant,
         servant-client,
