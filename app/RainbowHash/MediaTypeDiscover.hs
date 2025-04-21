@@ -33,5 +33,6 @@ discoverMediaTypeBS bs =
          & fromMaybe defaultMediaType
          & pure
 
+-- TODO: update not to use discoverMediaTypeBS so that a temp file does not need to be used.
 discoverMediaTypeFP :: FilePath -> IO MediaType
 discoverMediaTypeFP fp = BS.readFile fp >>= discoverMediaTypeBS

@@ -18,9 +18,10 @@ import qualified Data.Time.Clock as Time
 import System.FilePath (takeFileName)
 
 import RainbowHash.LinkedData
-import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, getRecentFiles, httpClientErrorToString, postToSPARQL, HTTPClientError)
+import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, postToSPARQL, HTTPClientError)
 import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 import RainbowHash.RDF4H (fileDataToRDF)
+import qualified RainbowHash.HSPARQL as HSPARQL
 import RainbowHash.Config (Config(..))
 
 newtype AppError = HTTPClientError HTTPClientError
@@ -37,7 +38,7 @@ runApp (AppM except) = runReaderT (runExceptT except)
 
 instance FileGet AppM where
   getFile _ = pure Nothing
-  getRecentFiles = liftIO HTTPClient.getRecentFiles
+  getRecentFiles = asks sparqlEndpoint >>= liftIO . HSPARQL.getRecentFiles
 
 instance FilePut AppM FilePath where
   putFileInStore fp = do

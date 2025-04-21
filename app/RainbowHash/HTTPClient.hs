@@ -8,29 +8,23 @@ module RainbowHash.HTTPClient
   , mapError
   , httpClientErrorToString
   , postToSPARQL
-  , getRecentFiles
   ) where
 
 import Protolude
 
 import Control.Monad.Catch (MonadMask)
+import Control.Monad.Error (mapError)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.RDF (Rdf, RDF, hWriteRdf, TurtleSerializer(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Time.Clock (getCurrentTime)
-import qualified Data.UUID as UUID
 import Network.HTTP.Client (Request, Response, parseRequest, newManager, defaultManagerSettings, responseHeaders, httpNoBody, httpLbs, responseStatus, responseBody, requestHeaders, requestBody, RequestBody(RequestBodyBS))
 import Network.HTTP.Client.MultipartFormData (formDataBody, partFileSource)
-import Network.HTTP.Media (MediaType, (//))
 import Network.HTTP.Types (Header, hLocation, Status, statusIsSuccessful)
 import System.IO (hClose)
 import System.IO.Temp (withSystemTempFile)
-import System.Random (randomIO)
 import Text.URI (URI, mkURI, render)
-
-import RainbowHash.File (File(..))
 
 data HTTPClientError
   = HeaderError HeaderError
@@ -51,17 +45,6 @@ putFile blobStoreUrl fp = do
   resp <- liftIO $ httpNoBody req mgr
   checkStatus resp
   mapError HeaderError (getLocationHeader resp)
-
-mapError
-  :: MonadError e' m
-  => (e -> e')
-  -> ExceptT e m a
-  -> m a
-mapError f ex = do
-  either' <- runExceptT ex
-  case either' of
-    Left e -> throwError (f e)
-    Right v -> pure v
 
 mkPostFileRequest :: URI -> FilePath -> IO Request
 mkPostFileRequest blobStorageUrl fp =
@@ -194,18 +177,3 @@ postToSPARQL gspUri graph = do
           => Response LBS.ByteString
           -> m (Either HTTPClientError ())
         responseToEither = pure . checkStatusWithTextMessage (T.take 100 . T.decodeUtf8 . LBS.toStrict)
-
--- TODO: implement. currently returning fake data.
-getRecentFiles :: IO [File]
-getRecentFiles = traverse randomFile ["someFile", "anotherFile", "yetAnotherFile"]
-  where randomFile :: Text -> IO File
-        randomFile name = do
-          now <- getCurrentTime
-          fileUri <- randomURI
-          contentUri <- randomURI
-          let mt :: MediaType
-              mt = "application" // "octet-stream"
-          pure $ File fileUri (Just name) mt now Nothing contentUri
-
-        randomURI :: IO URI
-        randomURI = randomIO >>= mkURI . ("http://example.com/files/" <>) . UUID.toText

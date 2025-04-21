@@ -59,7 +59,8 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules: RainbowHash.LinkedData
+    exposed-modules: Control.Monad.Error
+                     RainbowHash.LinkedData
                      RainbowHash.File
 
     -- Modules included in this library but not exported.
@@ -98,6 +99,7 @@ executable rainbow-hash-ld
                    RainbowHash.MediaTypeDiscover
                    RainbowHash.RDF4H
                    RainbowHash.Server
+                   RainbowHash.HSPARQL
                    RainbowHash.View.File
                    RainbowHash.View.Home
                    RainbowHash.View.HTML
@@ -112,6 +114,7 @@ executable rainbow-hash-ld
         containers,
         exceptions,
         filepath,
+        hsparql,
         http-client,
         http-media,
         http-types,
