@@ -82,19 +82,15 @@ getRecentFiles sparqlEndpoint = do
           mediaType <- getMediaType mediaTypeBV
           createdAt <- getCreatedAt createdBV
           maybeUpdatedAt <- getUpdatedAt updatedBV
+          let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri maybeFileName mediaType createdAt maybeUpdatedAt contentUrl
+          pure $ File fileUri maybeFileName mediaType createdAt updatedAt contentUrl
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
 
         getUri
           :: MonadError HsparqlError m
           => BindingValue
           -> m URI
-        -- getUri Unbound = throwError UnboundValue
-        -- getUri (Bound (UNode uriText)) = case mkURI uriText of
-        --   Nothing -> throwError $ URIParseError uriText
-        --   Just uri -> pure uri
-        -- getUri (Bound node) = throwError $ BindingParseError node
 
         getUri = parseUnboundAsError parseUri
           where parseUri
@@ -146,15 +142,6 @@ getRecentFiles sparqlEndpoint = do
           => BindingValue
           -> m (Maybe UTCTime)
         getUpdatedAt = sequence . parseBoundNode parseDateTimeNode
-
-        -- parseDateTimeNodeMaybe
-        --   :: MonadError HsparqlError m
-        --   => Node
-        --   -> m (Maybe UTCTime)
-        -- parseDateTimeNodeMaybe (LNode (TypedL iso8601Text _)) =
-        --   case iso8601ParseM (unpack iso8601Text) of
-        --     Nothing -> throwError $ DateTimeParseError iso8601Text
-        --     Just t -> pure $ Just t
 
         parseDateTimeNode
           :: MonadError HsparqlError m

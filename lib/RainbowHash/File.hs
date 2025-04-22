@@ -11,6 +11,6 @@ data File = File
   , fileName :: Maybe Text
   , fileMediaType :: MediaType
   , fileCreatedAt :: UTCTime
-  , fileUpdatedAt :: Maybe UTCTime
+  , fileUpdatedAt :: UTCTime -- will equal fileCreatedAt if it has not been updated after creation.
   , fileContent :: URI
   }
