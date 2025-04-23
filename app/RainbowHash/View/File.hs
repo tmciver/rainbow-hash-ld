@@ -25,6 +25,7 @@ instance ToHtml [File] where
         th_ "File name"
         th_ "Media Type"
         th_ "Created"
+        th_ "Last Modified"
         th_ "Content"
       foldMap toHtml files
 
@@ -36,6 +37,7 @@ instance ToHtml File where
       td_ (toHtml . fromMaybe "" . RH.fileName $ f)
       td_ (toHtml . T.decodeUtf8 . renderHeader . RH.fileMediaType $ f)
       td_ (toHtml . (show :: UTCTime -> Text) . RH.fileCreatedAt $ f)
+      td_ (toHtml . (show :: UTCTime -> Text) . RH.fileUpdatedAt $ f)
       td_ (a_ [href_ (render . RH.fileContent $ f)] (toHtml ("Link" :: Text)))
 
   toHtmlRaw = toHtml
