@@ -9,6 +9,7 @@ import Text.URI (URI)
 data File = File
   { fileUri :: URI
   , fileName :: Maybe Text
+  , fileTitle :: Maybe Text
   , fileMediaType :: MediaType
   , fileCreatedAt :: UTCTime
   , fileUpdatedAt :: UTCTime -- will equal fileCreatedAt if it has not been updated after creation.

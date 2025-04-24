@@ -76,15 +76,16 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile [fileUriBV, fileNameBV, titleBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           fileUri <- getUri fileUriBV
           maybeFileName <- getFileName fileNameBV
+          maybeTitle <- getTitle titleBV
           mediaType <- getMediaType mediaTypeBV
           createdAt <- getCreatedAt createdBV
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri maybeFileName mediaType createdAt updatedAt contentUrl
+          pure $ File fileUri maybeFileName maybeTitle mediaType createdAt updatedAt contentUrl
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
 
         getUri
@@ -102,19 +103,30 @@ getRecentFiles sparqlEndpoint = do
                   Just uri -> pure uri
                 parseUri node = throwError $ BindingValueError $ NonURINodeError node
 
+        -- TODO: create a generic getLiteral in favor of getFileName and getTitle
         getFileName
           :: MonadError HsparqlError m
           => BindingValue
           -> m (Maybe Text)
         getFileName bv = sequence $ parseBoundNode parseFileName bv
-          -- Nothing -> pure Nothing
-          -- Just mFileName -> mFileName <&> Just
           where parseFileName
                   :: MonadError HsparqlError m
                   => Node
                   -> m Text
                 parseFileName (LNode (PlainL fileName)) = pure fileName
                 parseFileName node = throwError $ BindingValueError $ LiteralParseError node
+
+        getTitle
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m (Maybe Text)
+        getTitle bv = sequence $ parseBoundNode parseTitle bv
+          where parseTitle
+                  :: MonadError HsparqlError m
+                  => Node
+                  -> m Text
+                parseTitle (LNode (PlainL title)) = pure title
+                parseTitle node = throwError $ BindingValueError $ LiteralParseError node
 
         getMediaType
           :: MonadError HsparqlError m
@@ -173,18 +185,22 @@ getRecentFiles sparqlEndpoint = do
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
   rdf <- prefix "rdf" (iriRef "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+  rdfs <- prefix "rdfs" (iriRef "http://www.w3.org/2000/01/rdf-schema#")
   nfo <- prefix "nfo" (iriRef "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#")
   schema <- prefix "schema" (iriRef "https://schema.org/")
 
   fileIri <- var
   name <- var
+  label <- var
   mediaType <- var
   created <- var
   updated <- var
   contentUrl <- var
 
+  -- TODO: use optional for optional values
   triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
   triple_ fileIri (nfo .:. "fileName") name
+  triple_ fileIri (rdfs .:. "label") label
   triple_ fileIri (schema .:. "encodingFormat") mediaType
   triple_ fileIri (nfo .:. "fileCreated") created
   triple_ fileIri (nfo .:. "fileLastModified") updated
@@ -194,4 +210,4 @@ recentFilesQuery = do
 
   limit_ 10
 
-  selectVars [fileIri, name, mediaType, created, updated, contentUrl]
+  selectVars [fileIri, name, label, mediaType, created, updated, contentUrl]

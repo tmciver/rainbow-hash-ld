@@ -33,6 +33,7 @@ class Monad m => MetadataPut m where
     :: URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
     -> Maybe Text -- ^file name. May be unavailable if client calls putFile on ByteString.
+    -> Maybe Text -- ^title
     -> UTCTime -- ^file creation time
     -> MediaType
     -> m URI
@@ -57,9 +58,10 @@ putFile
   => v
   -> URI -- ^URI of agent putting the file
   -> Maybe Text -- ^filename
+  -> Maybe Text -- ^title
   -> Maybe MediaType
   -> m URI
-putFile v createdByUri maybeFileName maybeMT = do
+putFile v createdByUri maybeFileName maybeTitle maybeMT = do
 
   -- Get the current time
   t <- getCurrentTime
@@ -76,7 +78,7 @@ putFile v createdByUri maybeFileName maybeMT = do
   blobUrl <- putFileInStore v
 
   -- Add the metadata to the linked data store.
-  fileUrl <- putFileMetadata blobUrl createdByUri maybeFileName' t mt
+  fileUrl <- putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle t mt
 
   logPutFile fileUrl blobUrl t mt
 

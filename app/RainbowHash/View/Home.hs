@@ -23,6 +23,11 @@ instance ToHtml Home where
           label_ "Upload a File"
           br_ []
           input_ [type_ "file", name_ "file"]
+
+          br_ []
+          label_ "Title"
+          br_ []
+          input_ [type_ "text", name_ "title"]
         br_ []
         input_ [type_ "submit", value_ "Submit"]
 

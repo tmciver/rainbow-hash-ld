@@ -23,6 +23,7 @@ instance ToHtml [File] where
     table_ [makeAttribute "border" "1"] $ do
       tr_ $ do
         th_ "File name"
+        th_ "Title"
         th_ "Media Type"
         th_ "Created"
         th_ "Last Modified"
@@ -35,6 +36,7 @@ instance ToHtml File where
   toHtml (File f) = do
     tr_ $ do
       td_ (toHtml . fromMaybe "" . RH.fileName $ f)
+      td_ (toHtml . fromMaybe "" . RH.fileTitle $ f)
       td_ (toHtml . T.decodeUtf8 . renderHeader . RH.fileMediaType $ f)
       td_ (toHtml . (show :: UTCTime -> Text) . RH.fileCreatedAt $ f)
       td_ (toHtml . (show :: UTCTime -> Text) . RH.fileUpdatedAt $ f)

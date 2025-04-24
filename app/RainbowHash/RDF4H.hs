@@ -22,10 +22,11 @@ fileDataToRDF
   => URI -- ^URI to the bytes of the file content.
   -> URI -- ^URI of the agent that created the file.
   -> Maybe Text -- ^filename
+  -> Maybe Text -- ^title
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF blobUrl createdByUri maybeFileName time mt = do
+fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle time mt = do
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
 
@@ -54,9 +55,12 @@ fileDataToRDF blobUrl createdByUri maybeFileName time mt = do
       triples =
 
         -- RDFS
-        let label = case maybeFileName of
-                      Just fileName -> "A file with name \"" <> fileName <> "\""
-                      Nothing -> "A file with no name"
+        -- If there's a title, use that; otherwise use the file name.
+        -- FIXME: don't add a label if title and file name are absent
+        let label = case (maybeTitle, maybeFileName) of
+                      (Just title, _) -> title
+                      (_, Just fileName) -> "A file with name \"" <> fileName <> "\""
+                      _ -> "A file with no name or title"
         in
           [ triple (unode fileUriText) (unode "rdfs:label") (unode $ show label)
           , triple (unode fileUriText) (unode "rdfs:comment") (unode $ show label)
@@ -101,6 +105,10 @@ fileDataToRDF blobUrl createdByUri maybeFileName time mt = do
 
         -- Schema.org stuff
         [triple (unode fileUriText) (unode "schema:encodingFormat") (unode $ show $ renderHeader mt)]
+        <>
+        case maybeTitle of
+          Just title -> [triple (unode fileUriText) (unode "schema:title") (unode $ show title)]
+          Nothing -> []
 
       rdf = mkRdf triples (Just $ BaseUrl baseUrlText) prefixes
 

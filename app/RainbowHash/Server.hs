@@ -49,24 +49,34 @@ filesHandler
   -> Handler (Headers '[Header "Location" ServantURI] NoContent)
 filesHandler multipartData = do
   case files multipartData of
-    [fileData] -> uploadFile fileData
+    [fileData] -> uploadFile fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
-  where uploadFile :: FileData Tmp -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-        uploadFile fileData = do
+  where uploadFile
+          :: FileData Tmp
+          -> [Input]
+          -> Handler (Headers '[Header "Location" ServantURI] NoContent)
+        uploadFile fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
+              maybeTitle = getTitle fields
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
+              -- FIXME: agentUri should come from client
               agentUri :: URI
               agentUri = "http://timmciver.com/me#" & mkURI & fromJust
 
           config <- liftIO getConfig
 
-          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeMT) config
+          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeMT) config
           case either' of
             Left err -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
+
+        getTitle :: [Input] -> Maybe Text
+        getTitle = (<&> iValue) . find isTitle
+          where isTitle :: Input -> Bool
+                isTitle = (== "title") . iName
 
         errToLBS :: AppError -> LBS.ByteString
         errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
