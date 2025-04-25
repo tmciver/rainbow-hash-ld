@@ -78,8 +78,8 @@ getRecentFiles sparqlEndpoint = do
           -> m File
         toFile [fileUriBV, fileNameBV, titleBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           fileUri <- getUri fileUriBV
-          maybeFileName <- getFileName fileNameBV
-          maybeTitle <- getTitle titleBV
+          maybeFileName <- getPlainLiteral fileNameBV
+          maybeTitle <- getPlainLiteral titleBV
           mediaType <- getMediaType mediaTypeBV
           createdAt <- getCreatedAt createdBV
           maybeUpdatedAt <- getUpdatedAt updatedBV
@@ -92,7 +92,6 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => BindingValue
           -> m URI
-
         getUri = parseUnboundAsError parseUri
           where parseUri
                   :: MonadError HsparqlError m
@@ -103,30 +102,17 @@ getRecentFiles sparqlEndpoint = do
                   Just uri -> pure uri
                 parseUri node = throwError $ BindingValueError $ NonURINodeError node
 
-        -- TODO: create a generic getLiteral in favor of getFileName and getTitle
-        getFileName
+        getPlainLiteral
           :: MonadError HsparqlError m
           => BindingValue
           -> m (Maybe Text)
-        getFileName bv = sequence $ parseBoundNode parseFileName bv
-          where parseFileName
+        getPlainLiteral = sequence . parseBoundNode parsePlainLiteral'
+          where parsePlainLiteral'
                   :: MonadError HsparqlError m
                   => Node
                   -> m Text
-                parseFileName (LNode (PlainL fileName)) = pure fileName
-                parseFileName node = throwError $ BindingValueError $ LiteralParseError node
-
-        getTitle
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m (Maybe Text)
-        getTitle bv = sequence $ parseBoundNode parseTitle bv
-          where parseTitle
-                  :: MonadError HsparqlError m
-                  => Node
-                  -> m Text
-                parseTitle (LNode (PlainL title)) = pure title
-                parseTitle node = throwError $ BindingValueError $ LiteralParseError node
+                parsePlainLiteral' (LNode (PlainL t)) = pure t
+                parsePlainLiteral' node = throwError $ BindingValueError $ LiteralParseError node
 
         getMediaType
           :: MonadError HsparqlError m
