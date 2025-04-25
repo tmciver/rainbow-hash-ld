@@ -78,8 +78,8 @@ getRecentFiles sparqlEndpoint = do
           -> m File
         toFile [fileUriBV, fileNameBV, titleBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           fileUri <- getUri fileUriBV
-          maybeFileName <- getPlainLiteral fileNameBV
-          maybeTitle <- getPlainLiteral titleBV
+          maybeFileName <- getPlainLiteralMaybe fileNameBV
+          maybeTitle <- getPlainLiteralMaybe titleBV
           mediaType <- getMediaType mediaTypeBV
           createdAt <- getCreatedAt createdBV
           maybeUpdatedAt <- getUpdatedAt updatedBV
@@ -102,32 +102,38 @@ getRecentFiles sparqlEndpoint = do
                   Just uri -> pure uri
                 parseUri node = throwError $ BindingValueError $ NonURINodeError node
 
-        getPlainLiteral
+        parsePlainLiteralNode
+          :: MonadError HsparqlError m
+          => Node
+          -> m Text
+        parsePlainLiteralNode (LNode (PlainL t)) = pure t
+        parsePlainLiteralNode n = throwError $ BindingValueError $ LiteralParseError n
+
+        getPlainLiteralMaybe
           :: MonadError HsparqlError m
           => BindingValue
           -> m (Maybe Text)
-        getPlainLiteral = sequence . parseBoundNode parsePlainLiteral'
-          where parsePlainLiteral'
-                  :: MonadError HsparqlError m
-                  => Node
-                  -> m Text
-                parsePlainLiteral' (LNode (PlainL t)) = pure t
-                parsePlainLiteral' node = throwError $ BindingValueError $ LiteralParseError node
+        getPlainLiteralMaybe = sequence . parseBoundNode parsePlainLiteralNode
+
+        getPlainLiteral
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m Text
+        getPlainLiteral = parseUnboundAsError parsePlainLiteralNode
 
         getMediaType
           :: MonadError HsparqlError m
           => BindingValue
           -> m MediaType
-        getMediaType = parseUnboundAsError parseMediaType'
+        getMediaType = (parseMediaType' =<<) . getPlainLiteral
           where parseMediaType'
                   :: MonadError HsparqlError m
-                  => Node
+                  => Text
                   -> m MediaType
-                parseMediaType' (LNode (PlainL mediaTypeText)) =
-                  case parseAccept . T.encodeUtf8 $ mediaTypeText of
+                parseMediaType' t =
+                  case parseAccept $ T.encodeUtf8 t of
                     Just mt -> pure mt
-                    Nothing -> throwError $ BindingValueError $ MediaTypeParseError mediaTypeText
-                parseMediaType' node = throwError $ BindingValueError $ LiteralParseError node
+                    Nothing -> throwError $ BindingValueError $ MediaTypeParseError t
 
         getCreatedAt
           :: MonadError HsparqlError m
