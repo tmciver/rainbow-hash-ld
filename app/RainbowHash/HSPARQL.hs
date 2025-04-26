@@ -76,16 +76,17 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, titleBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile [fileUriBV, fileNameBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           fileUri <- getUri fileUriBV
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           maybeTitle <- getPlainLiteralMaybe titleBV
+          maybeDesc <- getPlainLiteralMaybe descBV
           mediaType <- getMediaType mediaTypeBV
           createdAt <- getCreatedAt createdBV
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri maybeFileName maybeTitle mediaType createdAt updatedAt contentUrl
+          pure $ File fileUri maybeFileName maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
 
         getUri
@@ -184,6 +185,7 @@ recentFilesQuery = do
   fileIri <- var
   name <- var
   label <- var
+  desc <- var
   mediaType <- var
   created <- var
   updated <- var
@@ -193,6 +195,7 @@ recentFilesQuery = do
   triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
   optional_ (triple_ fileIri (nfo .:. "fileName") name)
   optional_ (triple_ fileIri (rdfs .:. "label") label)
+  optional_ (triple_ fileIri (rdfs .:. "comment") desc)
   triple_ fileIri (schema .:. "encodingFormat") mediaType
   triple_ fileIri (nfo .:. "fileCreated") created
   triple_ fileIri (nfo .:. "fileLastModified") updated
@@ -202,4 +205,4 @@ recentFilesQuery = do
 
   limit_ 10
 
-  selectVars [fileIri, name, label, mediaType, created, updated, contentUrl]
+  selectVars [fileIri, name, label, desc, mediaType, created, updated, contentUrl]

@@ -27,7 +27,13 @@ instance ToHtml Home where
           br_ []
           label_ "Title"
           br_ []
-          input_ [type_ "text", name_ "title"]
+          input_ [type_ "text", name_ "title", placeholder_ "Enter a title for the file"]
+
+          br_ []
+          label_ "Description"
+          br_ []
+          textarea_ [name_ "description", placeholder_ "Enter a description of the file"] (toHtml ("" :: Text))
+
         br_ []
         input_ [type_ "submit", value_ "Submit"]
 

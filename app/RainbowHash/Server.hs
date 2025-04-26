@@ -60,6 +60,7 @@ filesHandler multipartData = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
+              maybeDesc = getDescription fields
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
               -- FIXME: agentUri should come from client
@@ -68,7 +69,7 @@ filesHandler multipartData = do
 
           config <- liftIO getConfig
 
-          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeMT) config
+          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeDesc maybeMT) config
           case either' of
             Left err -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
@@ -77,6 +78,11 @@ filesHandler multipartData = do
         getTitle = (<&> iValue) . find isTitle
           where isTitle :: Input -> Bool
                 isTitle = (== "title") . iName
+
+        getDescription :: [Input] -> Maybe Text
+        getDescription = (<&> iValue) . find isDescription
+          where isDescription :: Input -> Bool
+                isDescription = (== "description") . iName
 
         errToLBS :: AppError -> LBS.ByteString
         errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString

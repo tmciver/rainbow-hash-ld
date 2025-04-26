@@ -23,10 +23,11 @@ fileDataToRDF
   -> URI -- ^URI of the agent that created the file.
   -> Maybe Text -- ^filename
   -> Maybe Text -- ^title
+  -> Maybe Text -- ^description
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle time mt = do
+fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = do
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
 
@@ -62,9 +63,11 @@ fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle time mt = do
                       (_, Just fileName) -> "A file with name \"" <> fileName <> "\""
                       _ -> "A file with no name or title"
         in
-          [ triple (unode fileUriText) (unode "rdfs:label") (unode $ show label)
-          , triple (unode fileUriText) (unode "rdfs:comment") (unode $ show label)
-          ]
+          [triple (unode fileUriText) (unode "rdfs:label") (unode $ show label)]
+        <>
+        case maybeDesc of
+          Just desc -> [triple (unode fileUriText) (unode "rdfs:comment") (unode $ show desc)]
+          Nothing -> []
         <>
 
         -- Create a FileData object. This is similar to a nfo:FileDataObject but
