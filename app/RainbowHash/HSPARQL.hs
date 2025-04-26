@@ -191,8 +191,8 @@ recentFilesQuery = do
 
   -- TODO: use optional for optional values
   triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
-  triple_ fileIri (nfo .:. "fileName") name
-  triple_ fileIri (rdfs .:. "label") label
+  optional_ (triple_ fileIri (nfo .:. "fileName") name)
+  optional_ (triple_ fileIri (rdfs .:. "label") label)
   triple_ fileIri (schema .:. "encodingFormat") mediaType
   triple_ fileIri (nfo .:. "fileCreated") created
   triple_ fileIri (nfo .:. "fileLastModified") updated
