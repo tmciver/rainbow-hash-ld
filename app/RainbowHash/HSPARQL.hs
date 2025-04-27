@@ -6,8 +6,9 @@ module RainbowHash.HSPARQL
 
 import Protolude
 
+import Control.Monad.Logger (LogLevel(LevelError, LevelDebug))
 import Data.RDF (Node(..), LValue(..))
-import Data.Text (unpack)
+import Data.Text (pack, unpack)
 import qualified Data.Text.Encoding as T
 import Data.Time (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
@@ -18,6 +19,7 @@ import Numeric.Natural (Natural)
 import Text.URI (URI, mkURI, render)
 
 import RainbowHash.File (File(..))
+import RainbowHash.Logger (writeLog)
 
 data HsparqlError
   = BindingValueError BindingValueError
@@ -50,16 +52,20 @@ instance ToDisplayText HsparqlError where
   toDisplayText (DateTimeParseError t) = "Error when trying to parse a datetime from text: \"" <> t <> "\"."
 
 logSparqlError :: HsparqlError -> IO ()
--- TODO: do proper logging.
-logSparqlError = putStrLn . toDisplayText
+logSparqlError = writeLog LevelError . toDisplayText
 
 getRecentFiles :: URI -> IO [File]
 getRecentFiles sparqlEndpoint = do
-  -- putStrLn . pack . createSelectQuery $ recentFilesQuery
-  fileEithers <- maybe [] toFiles <$> selectQuery (unpack $ render sparqlEndpoint) recentFilesQuery
-  -- selectQuery (unpack $ render sparqlEndpoint) recentFilesQuery >>= print
+  -- Log the SPARQL query
+  writeLog LevelDebug (pack . createSelectQuery $ recentFilesQuery)
 
-  let (errors, files) = partitionEithers fileEithers
+  maybeBvss <- selectQuery (unpack $ render sparqlEndpoint) recentFilesQuery
+
+  -- Log the returned binding values
+  writeLog LevelDebug (show maybeBvss)
+
+  let (errors, files) = maybeBvss & maybe [] toFiles
+                                  & partitionEithers
 
   -- log errors
   forM_ errors logSparqlError
@@ -191,7 +197,6 @@ recentFilesQuery = do
   updated <- var
   contentUrl <- var
 
-  -- TODO: use optional for optional values
   triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
   optional_ (triple_ fileIri (nfo .:. "fileName") name)
   optional_ (triple_ fileIri (rdfs .:. "label") label)

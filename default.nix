@@ -39,6 +39,12 @@ pkgs.haskellPackages.developPackage {
         rev = "cca28da32a9da6fb0c3109d2601cfc3e43172c7c";
         hash = "sha256-mlNq3UtbxEXanLprhG7UE5678z4qudbdHbQYfW/84AI=";
       };
+      rainbowHashSrc = pkgs.fetchFromGitHub {
+        owner = "tmciver";
+        repo = "rainbow-hash";
+        rev = "1abedaa6a0f9a16a27755ba5ecdd394b43413d6a";
+        hash = "sha256-ecy3hPyer51k5FYapab5i3OTnfw8/QB51uKct4gbovE=";
+      };
     in {
       # tls = overrideCabal prev.tls {
       #   version = "1.6.0";
@@ -46,8 +52,8 @@ pkgs.haskellPackages.developPackage {
       # };
       # connection = doJailbreak prev.connection;
       rdf4h = doJailbreak prev.rdf4h;
-
       hsparql = pkgs.haskellPackages.callCabal2nix "hsparql" hsparqlSrc {};
+      rainbow-hash = pkgs.haskellPackages.callCabal2nix "rainbow-hash" rainbowHashSrc {};
     };
       
   modifier = drv:

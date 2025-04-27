@@ -17,8 +17,9 @@ import qualified Data.Text as T
 import qualified Data.Time.Clock as Time
 import System.FilePath (takeFileName)
 
-import RainbowHash.LinkedData
 import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, postToSPARQL, HTTPClientError)
+import RainbowHash.LinkedData
+import RainbowHash.Logger (writeLog)
 import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 import RainbowHash.RDF4H (fileDataToRDF)
 import qualified RainbowHash.HSPARQL as HSPARQL
@@ -66,4 +67,4 @@ instance Time AppM where
   getCurrentTime = liftIO Time.getCurrentTime
 
 instance MonadLogger AppM where
-  monadLoggerLog _ _ _ = liftIO . putStrLn . fromLogStr . toLogStr
+  monadLoggerLog _ _ logLevel = liftIO . writeLog logLevel . decodeUtf8 . fromLogStr . toLogStr

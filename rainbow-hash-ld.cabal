@@ -124,6 +124,7 @@ executable rainbow-hash-ld
         monad-logger,
         mtl,
         protolude,
+        rainbow-hash,
         rainbow-hash-ld,
         random,
         rdf4h,
