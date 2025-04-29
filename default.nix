@@ -42,8 +42,8 @@ pkgs.haskellPackages.developPackage {
       rainbowHashSrc = pkgs.fetchFromGitHub {
         owner = "tmciver";
         repo = "rainbow-hash";
-        rev = "1abedaa6a0f9a16a27755ba5ecdd394b43413d6a";
-        hash = "sha256-ecy3hPyer51k5FYapab5i3OTnfw8/QB51uKct4gbovE=";
+        rev = "d76f5f8f7e434221cfd618ee57709ca82f4ee19f";
+        hash = "sha256-0XMDnk9QlojlWrB0E/DLEDkm7wrV5z3G7OB3QlH14R4=";
       };
     in {
       # tls = overrideCabal prev.tls {
