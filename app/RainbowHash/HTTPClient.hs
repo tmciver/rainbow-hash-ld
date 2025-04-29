@@ -13,6 +13,7 @@ module RainbowHash.HTTPClient
 import Protolude
 
 import Control.Monad.Catch (MonadMask)
+import Control.Monad.Error (mapError)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.RDF (Rdf, RDF, hWriteRdf, TurtleSerializer(..))
@@ -44,17 +45,6 @@ putFile blobStoreUrl fp = do
   resp <- liftIO $ httpNoBody req mgr
   checkStatus resp
   mapError HeaderError (getLocationHeader resp)
-
-mapError
-  :: MonadError e' m
-  => (e -> e')
-  -> ExceptT e m a
-  -> m a
-mapError f ex = do
-  either' <- runExceptT ex
-  case either' of
-    Left e -> throwError (f e)
-    Right v -> pure v
 
 mkPostFileRequest :: URI -> FilePath -> IO Request
 mkPostFileRequest blobStorageUrl fp =

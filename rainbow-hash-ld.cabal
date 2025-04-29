@@ -59,8 +59,9 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules: RainbowHash.LinkedData
-                     RainbowHash.MediaType
+    exposed-modules: Control.Monad.Error
+                     RainbowHash.LinkedData
+                     RainbowHash.File
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -70,6 +71,7 @@ library
 
     -- Other library packages from which modules are imported.
     build-depends:    base,
+                      http-media,
                       modern-uri,
                       monad-logger,
                       protolude,
@@ -92,9 +94,15 @@ executable rainbow-hash-ld
 
     -- Modules included in this executable, other than Main.
     other-modules: RainbowHash.App
+                   RainbowHash.Config
                    RainbowHash.HTTPClient
                    RainbowHash.MediaTypeDiscover
                    RainbowHash.RDF4H
+                   RainbowHash.Server
+                   RainbowHash.HSPARQL
+                   RainbowHash.View.File
+                   RainbowHash.View.Home
+                   RainbowHash.View.HTML
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -106,15 +114,21 @@ executable rainbow-hash-ld
         containers,
         exceptions,
         filepath,
+        hsparql,
         http-client,
+        http-media,
         http-types,
+        lucid,
         magic,
         modern-uri,
         monad-logger,
         mtl,
         protolude,
+        rainbow-hash,
         rainbow-hash-ld,
+        random,
         rdf4h,
+        servant,
         servant-client,
         servant-multipart,
         servant-multipart-client,
@@ -122,7 +136,9 @@ executable rainbow-hash-ld
         temporary,
         text,
         time,
-        uuid
+        uuid,
+        wai,
+        warp
 
     -- Directories containing source files.
     hs-source-dirs:   app

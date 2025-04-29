@@ -4,6 +4,7 @@
 module RainbowHash.LinkedData
   ( putFile
   , FilePut(..)
+  , FileGet(..)
   , MetadataPut(..)
   , MediaTypeDiscover(..)
   , FileNameGet(..)
@@ -13,19 +14,27 @@ module RainbowHash.LinkedData
 import Protolude
 
 import Control.Monad.Logger (MonadLogger(..), logInfoN)
+import Data.Text.Encoding as T
 import Data.Time.Clock (UTCTime)
+import Network.HTTP.Media (MediaType, renderHeader)
 import Text.URI (URI, render)
 
-import RainbowHash.MediaType
+import RainbowHash.File (File)
 
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
+
+class Monad m => FileGet m where
+  getFile :: URI -> m (Maybe File)
+  getRecentFiles :: m [File]
 
 class Monad m => MetadataPut m where
   putFileMetadata
     :: URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
     -> Maybe Text -- ^file name. May be unavailable if client calls putFile on ByteString.
+    -> Maybe Text -- ^title
+    -> Maybe Text -- ^description
     -> UTCTime -- ^file creation time
     -> MediaType
     -> m URI
@@ -50,9 +59,11 @@ putFile
   => v
   -> URI -- ^URI of agent putting the file
   -> Maybe Text -- ^filename
+  -> Maybe Text -- ^title
+  -> Maybe Text -- ^description
   -> Maybe MediaType
   -> m URI
-putFile v createdByUri maybeFileName maybeMT = do
+putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT = do
 
   -- Get the current time
   t <- getCurrentTime
@@ -69,7 +80,7 @@ putFile v createdByUri maybeFileName maybeMT = do
   blobUrl <- putFileInStore v
 
   -- Add the metadata to the linked data store.
-  fileUrl <- putFileMetadata blobUrl createdByUri maybeFileName' t mt
+  fileUrl <- putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
 
   logPutFile fileUrl blobUrl t mt
 
@@ -86,5 +97,5 @@ logPutFile fileUrl blobUrl t mt =
   logInfoN
     $  "Created file object " <> toS (render fileUrl)
     <> " with blob URI " <> toS (render blobUrl)
-    <> " and media type " <> mediaTypeToText mt
+    <> " and media type " <> (T.decodeUtf8 $ renderHeader mt)
     <> " at " <> show t
