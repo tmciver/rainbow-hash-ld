@@ -15,6 +15,7 @@ instance ToHtml Home where
   toHtml (Home files) = html_ $ do
     head_ $ do
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
+      link_ [rel_ "stylesheet", href_ "static/style.css"]
     body_ $ do
       div_ [class_ "body-wrapper"] $ do
         form_

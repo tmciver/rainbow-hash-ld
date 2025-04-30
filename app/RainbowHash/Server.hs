@@ -28,6 +28,7 @@ instance ToHttpApiData ServantURI where
 type FilesAPI = Get '[HTML] Home
            :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
                         :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
+           :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
 api = Proxy
@@ -87,8 +88,11 @@ filesHandler multipartData = do
         errToLBS :: AppError -> LBS.ByteString
         errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
+staticHandler :: Server Raw
+staticHandler = serveDirectoryWebApp "static"
+
 server :: Server FilesAPI
-server = homeHandler :<|> filesHandler
+server = homeHandler :<|> filesHandler :<|> staticHandler
 
 app :: Application
 app = serve api server
