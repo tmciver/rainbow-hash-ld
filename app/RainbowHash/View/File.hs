@@ -20,16 +20,19 @@ instance ToHtml [File] where
   toHtml [] = pure ()
   toHtml files = do
     h2_ "Recent Files"
-    table_ [makeAttribute "border" "1"] $ do
-      tr_ $ do
-        th_ "File name"
-        th_ "Title"
-        th_ "Description"
-        th_ "Media Type"
-        th_ "Created"
-        th_ "Last Modified"
-        th_ "Content"
-      foldMap toHtml files
+    table_ [ makeAttribute "border" "1"
+           , classes_ ["table", "table-bordered", "table-hover"]
+           ] $ do
+      thead_ [class_ "thead-dark"] $ do
+        tr_ $ do
+          th_ "File name"
+          th_ "Title"
+          th_ "Description"
+          th_ "Media Type"
+          th_ "Created"
+          th_ "Last Modified"
+          th_ "Content"
+      tbody_ (foldMap toHtml files)
 
   toHtmlRaw = toHtml
 
