@@ -111,6 +111,7 @@ executable rainbow-hash-ld
     build-depends:
         base,
         bytestring,
+        case-insensitive,
         containers,
         exceptions,
         filepath,

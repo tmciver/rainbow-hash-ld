@@ -3,7 +3,7 @@
 
 module RainbowHash.View.Home (Home(..)) where
 
-import Protolude
+import Protolude hiding (for_)
 
 import Lucid
 
@@ -13,30 +13,46 @@ data Home = Home [File]
 
 instance ToHtml Home where
   toHtml (Home files) = html_ $ do
+    head_ $ do
+      link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
+      link_ [rel_ "stylesheet", href_ "static/style.css"]
     body_ $ do
-      form_
-       [ method_ "POST"
-       , action_ "/files"
-       , enctype_ "multipart/form-data"
-       ] $ do
-        div_ $ do
-          label_ "Upload a File"
-          br_ []
-          input_ [type_ "file", name_ "file"]
+      div_ [class_ "body-wrapper"] $ do
+        h1_ "Caldron"
+        form_
+          [ method_ "POST"
+          , action_ "/files"
+          , enctype_ "multipart/form-data"
+          ] $ do
+          div_ [class_ "form-group"] $ do
+            label_ [for_ "file-input"] "Upload a File"
+            input_ [ type_ "file"
+                   , name_ "file"
+                   , id_ "file-input"
+                   , class_ "form-control-file"
+                   ]
 
-          br_ []
-          label_ "Title"
-          br_ []
-          input_ [type_ "text", name_ "title", placeholder_ "Enter a title for the file"]
+          div_ [class_ "form-group"] $ do
+            label_ [for_ "title-input"] "Title"
+            input_ [ type_ "text"
+                   , name_ "title"
+                   , placeholder_ "Enter a title for the file"
+                   , id_ "title-input"
+                   , class_ "form-control"
+                   ]
 
-          br_ []
-          label_ "Description"
-          br_ []
-          textarea_ [name_ "description", placeholder_ "Enter a description of the file"] (toHtml ("" :: Text))
+          div_ [class_ "form-group"] $ do
+            label_ [for_ "desc-input"] "Description"
+            textarea_
+              [ name_ "description"
+              , placeholder_ "Enter a description of the file"
+              , id_ "desc-input"
+              , class_ "form-control"
+              ]
+              (toHtml ("" :: Text))
 
-        br_ []
-        input_ [type_ "submit", value_ "Submit"]
+          button_ [type_ "submit", classes_ ["btn", "btn-primary"]] (toHtml ("Submit" :: Text))
 
-      toHtml files
+        toHtml files
 
   toHtmlRaw = toHtml
