@@ -15,7 +15,7 @@ import Text.URI (URI, mkURI, render)
 
 import RainbowHash.App (runApp, appErrorToString, AppError)
 import RainbowHash.Config (getConfig)
-import RainbowHash.LinkedData (getRecentFiles, putFile)
+import RainbowHash.LinkedData (getRecentFiles, putFile, FileNodeCreateOption(..))
 import RainbowHash.View.File (File(..))
 import RainbowHash.View.Home (Home(..))
 import RainbowHash.View.HTML (HTML)
@@ -64,13 +64,15 @@ filesHandler multipartData = do
               maybeDesc = getDescription fields
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
+              fileNodeCreateOption :: FileNodeCreateOption
+              fileNodeCreateOption = getFileNodeCreationOption fields
               -- FIXME: agentUri should come from client
               agentUri :: URI
               agentUri = "http://timmciver.com/me#" & mkURI & fromJust
 
           config <- liftIO getConfig
 
-          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeDesc maybeMT) config
+          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
@@ -84,6 +86,15 @@ filesHandler multipartData = do
         getDescription = (<&> iValue) . find isDescription
           where isDescription :: Input -> Bool
                 isDescription = (== "description") . iName
+
+        getFileNodeCreationOption :: [Input] -> FileNodeCreateOption
+        getFileNodeCreationOption = boolToFNCO . fromMaybe False . (<&> (== "1") . iValue) . find isFileNodeCreationOption
+          where isFileNodeCreationOption :: Input -> Bool
+                isFileNodeCreationOption = (== "create-new-node") . iName
+
+                boolToFNCO :: Bool -> FileNodeCreateOption
+                boolToFNCO True = AlwaysCreate
+                boolToFNCO False = CreateIfNotExists
 
         errToLBS :: AppError -> LBS.ByteString
         errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString

@@ -9,6 +9,7 @@ module RainbowHash.LinkedData
   , MediaTypeDiscover(..)
   , FileNameGet(..)
   , Time(..)
+  , FileNodeCreateOption(..)
   ) where
 
 import Protolude
@@ -21,12 +22,22 @@ import Text.URI (URI, render)
 
 import RainbowHash.File (File)
 
+data FileNodeCreateOption
+  = AlwaysCreate
+  -- ^Creates a new FileDataObject (NEPOMUK) even if one already exists for this
+  -- content.
+  | CreateIfNotExists
+  -- ^Only creates a new FileDataObject if one does not exist for this
+  -- content. Returns the URI for the existing FileDataObject otherwise.
+  deriving (Show)
+
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
 
 class Monad m => FileGet m where
   getFile :: URI -> m (Maybe File)
   getRecentFiles :: m [File]
+  getFileForContent :: URI -> m (Maybe URI)
 
 class Monad m => MetadataPut m where
   putFileMetadata
@@ -49,7 +60,8 @@ class Monad m => Time m where
   getCurrentTime :: m UTCTime
 
 putFile
-  :: ( FilePut m v
+  :: ( FileGet m
+     , FilePut m v
      , MetadataPut m
      , MediaTypeDiscover m v
      , FileNameGet m v
@@ -62,8 +74,9 @@ putFile
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
   -> Maybe MediaType
+  -> FileNodeCreateOption
   -> m URI
-putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT = do
+putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
 
   -- Get the current time
   t <- getCurrentTime
@@ -79,23 +92,36 @@ putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT = do
   -- Add file to blob store.
   blobUrl <- putFileInStore v
 
-  -- Add the metadata to the linked data store.
-  fileUrl <- putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
+  -- What is done next depends on the value of fileNodeCreateOption
+  case fileNodeCreateOption of
+    AlwaysCreate ->
+      putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
+      >>= logPutFile blobUrl t mt
+    CreateIfNotExists -> do
+      maybeFileUrl <- getFileForContent blobUrl
+      case maybeFileUrl of
+        Just fileUrl' -> do
+          logInfoN "FileDataObject already exists for this content; returning existing URL."
+          -- TODO: should the title and description be updated to what's given in this request?
+          pure fileUrl'
+        Nothing ->
+          putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
+          >>= logPutFile blobUrl t mt
 
-  logPutFile fileUrl blobUrl t mt
-
-  pure fileUrl
-
+-- Logs the data used to create a file object.
+-- Takes the file URI argument last and returns it to facilitate monadic
+-- sequencing.
 logPutFile
   :: MonadLogger m
   => URI
-  -> URI
   -> UTCTime
   -> MediaType
-  -> m ()
-logPutFile fileUrl blobUrl t mt =
+  -> URI
+  -> m URI
+logPutFile blobUrl t mt fileUrl = do
   logInfoN
     $  "Created file object " <> toS (render fileUrl)
     <> " with blob URI " <> toS (render blobUrl)
-    <> " and media type " <> (T.decodeUtf8 $ renderHeader mt)
+    <> " and media type " <> T.decodeUtf8 (renderHeader mt)
     <> " at " <> show t
+  pure fileUrl

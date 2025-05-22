@@ -40,6 +40,7 @@ runApp (AppM except) = runReaderT (runExceptT except)
 instance FileGet AppM where
   getFile _ = pure Nothing
   getRecentFiles = asks sparqlEndpoint >>= liftIO . HSPARQL.getRecentFiles
+  getFileForContent contentUrl = asks sparqlEndpoint >>= liftIO . HSPARQL.getFileForContent contentUrl
 
 instance FilePut AppM FilePath where
   putFileInStore fp = do

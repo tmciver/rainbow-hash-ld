@@ -51,6 +51,16 @@ instance ToHtml Home where
               ]
               (toHtml ("" :: Text))
 
+          div_ [class_ "form-check"] $ do
+            input_ [ type_ "checkbox"
+                   , name_ "create-new-node"
+                   , id_ "new-node-checkbox"
+                   , class_ "form-check-input"
+                   ]
+            label_ [ for_ "new-node-checkbox"
+                   , class_ "form-check-label"]
+              "Create a new node even if one already exists for this content"
+
           button_ [type_ "submit", classes_ ["btn", "btn-primary"]] (toHtml ("Submit" :: Text))
 
         toHtml files

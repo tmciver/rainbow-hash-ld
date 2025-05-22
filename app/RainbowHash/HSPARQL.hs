@@ -2,11 +2,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module RainbowHash.HSPARQL
-  (getRecentFiles) where
+  ( getRecentFiles
+  , getFileForContent
+  ) where
 
 import Protolude
 
-import Control.Monad.Logger (LogLevel(LevelError, LevelDebug))
+import Control.Monad.Logger (LogLevel(LevelError, LevelDebug, LevelInfo))
 import Data.RDF (Node(..), LValue(..))
 import Data.Text (pack, unpack)
 import qualified Data.Text.Encoding as T
@@ -211,3 +213,35 @@ recentFilesQuery = do
   limit_ 10
 
   selectVars [fileIri, name, label, desc, mediaType, created, updated, contentUrl]
+
+getFileForContent :: URI -> URI -> IO (Maybe URI)
+getFileForContent contentUrl sparqlEndpoint = do
+  -- Log the SPARQL query
+  writeLog LevelDebug (pack . createSelectQuery $ recentFilesQuery)
+
+  maybeBvss <- selectQuery (unpack $ render sparqlEndpoint) (fileForContentQuery contentUrl)
+  pure $ maybeBvss >>= toUri
+  where toUri :: [[BindingValue]] -> Maybe URI
+        toUri [[Bound (UNode uriText)]] = mkURI uriText
+        toUri _ = Nothing
+
+fileForContentQuery :: URI -> Query SelectQuery
+fileForContentQuery contentUrl = do
+  rdf <- prefix "rdf" (iriRef "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+  nfo <- prefix "nfo" (iriRef "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#")
+
+  fileIri <- var
+  created <- var
+
+  let contentNode :: Node
+      contentNode = UNode $ render contentUrl
+
+  triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
+  triple_ fileIri (nfo .:. "fileUri") contentNode
+  triple_ fileIri (nfo .:. "fileCreated") created
+
+  orderNextDesc created
+
+  limit_ 1
+
+  selectVars [fileIri]
