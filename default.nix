@@ -42,8 +42,8 @@ pkgs.haskellPackages.developPackage {
       rainbowHashSrc = pkgs.fetchFromGitHub {
         owner = "tmciver";
         repo = "rainbow-hash";
-        rev = "d76f5f8f7e434221cfd618ee57709ca82f4ee19f";
-        hash = "sha256-0XMDnk9QlojlWrB0E/DLEDkm7wrV5z3G7OB3QlH14R4=";
+        rev = "b6928339020e147a8075e07c979cabf270513de9";
+        hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
       };
     in {
       # tls = overrideCabal prev.tls {
@@ -53,12 +53,15 @@ pkgs.haskellPackages.developPackage {
       # connection = doJailbreak prev.connection;
       rdf4h = doJailbreak prev.rdf4h;
       hsparql = pkgs.haskellPackages.callCabal2nix "hsparql" hsparqlSrc {};
-      rainbow-hash = pkgs.haskellPackages.callCabal2nix "rainbow-hash" rainbowHashSrc {};
+      rainbow-hash = import "${rainbowHashSrc}/default.nix" {};
     };
       
   modifier = drv:
     pkgs.haskell.lib.addBuildTools drv (with pkgs.haskellPackages;
-      [ cabal-install
+      [ ghc
+        cabal-install
         ghcid
+        haskell-language-server
+        hasktags
       ]);
 }
