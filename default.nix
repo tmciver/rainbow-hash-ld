@@ -52,8 +52,11 @@ pkgs.haskellPackages.developPackage {
       # };
       # connection = doJailbreak prev.connection;
       rdf4h = doJailbreak prev.rdf4h;
-      hsparql = pkgs.haskellPackages.callCabal2nix "hsparql" hsparqlSrc {};
-      rainbow-hash = import "${rainbowHashSrc}/default.nix" {};
+      hsparql = final.callCabal2nix "hsparql" hsparqlSrc {};
+      #hsparql = pkgs.haskellPackages.callCabal2nix "hsparql" hsparqlSrc {};
+      #rainbow-hash = import "${rainbowHashSrc}/default.nix" {};
+      rainbow-hash = final.callPackage "${rainbowHashSrc}/default.nix" {};
+      #rainbow-hash = pkgs.callPackage "${rainbowHashSrc}/default.nix" {};
     };
       
   modifier = drv:
@@ -64,4 +67,5 @@ pkgs.haskellPackages.developPackage {
         haskell-language-server
         hasktags
       ]);
+  #returnShellEnv = true; # setting to true does not add rainbowhash to package database
 }
