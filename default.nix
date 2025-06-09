@@ -11,22 +11,18 @@ in
 pkgs.haskellPackages.developPackage {
   root = ./.;
 
-  source-overrides =
-    let
-      rainbowHashSrc = pkgs.fetchFromGitHub {
-        owner = "tmciver";
-        repo = "rainbow-hash";
-        rev = "b6928339020e147a8075e07c979cabf270513de9";
-        hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
-      };
-    in
-      {
-        rainbow-hash = rainbowHashSrc; #pkgs.callPackage "${rainbowHashSrc}/default.nix" {};
-      };
+  source-overrides = {
+    rainbow-hash = pkgs.fetchFromGitHub {
+      owner = "tmciver";
+      repo = "rainbow-hash";
+      rev = "b6928339020e147a8075e07c979cabf270513de9";
+      hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
+    };
+  };
 
   overrides = final: prev:
     let
-      inherit (pkgs.haskell.lib) overrideCabal doJailbreak;
+      inherit (pkgs.haskell.lib) doJailbreak;
 
       hsparqlSrc = pkgs.fetchFromGitHub {
         owner = "tmciver";
@@ -34,21 +30,16 @@ pkgs.haskellPackages.developPackage {
         rev = "cca28da32a9da6fb0c3109d2601cfc3e43172c7c";
         hash = "sha256-mlNq3UtbxEXanLprhG7UE5678z4qudbdHbQYfW/84AI=";
       };
-      rainbowHashSrc = pkgs.fetchFromGitHub {
-        owner = "tmciver";
-        repo = "rainbow-hash";
-        rev = "b6928339020e147a8075e07c979cabf270513de9";
-        hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
-      };
     in {
       rdf4h = doJailbreak prev.rdf4h;
       hsparql = final.callCabal2nix "hsparql" hsparqlSrc {};
     };
-      
+
   modifier = drv:
     pkgs.haskell.lib.addBuildTools drv (with pkgs.haskellPackages;
       [cabal-install
        ghcid
        hasktags
+       stylish-haskell
       ]);
 }
