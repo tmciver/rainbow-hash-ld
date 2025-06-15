@@ -1,0 +1,66 @@
+spec-version: 0.36.0
+name: rainbow-hash-ld
+version: 0.0.1
+synopsis: A web-based file storage application utilizing linked data
+description: A web-based file storage application utilizing linked data
+author: Tim McIver <tim@timmciver.com>
+maintainer: Tim McIver <tim@timmciver.com>
+github: tmciver/rainbow-hash-ld
+category: Web
+
+ghc-options: -Wall -fno-warn-incomplete-uni-patterns
+
+default-extensions:
+  - NoImplicitPrelude
+  - OverloadedStrings
+
+dependencies:
+  - base # >= 4.13 && < 5
+  - text
+  - time
+  - protolude
+
+library:
+  source-dirs: lib
+  exposed-modules:
+    - Control.Monad.Error
+    - RainbowHash.LinkedData
+    - RainbowHash.File
+  dependencies:
+    - http-media
+    - modern-uri
+    - monad-logger
+    - protolude
+    - transformers
+
+executable:
+  main: Main.hs
+  source-dirs: app
+  dependencies:
+    - bytestring
+    - case-insensitive
+    - containers
+    - exceptions
+    - filepath
+    - hsparql
+    - http-client
+    - http-media
+    - http-types
+    - lucid
+    - magic
+    - modern-uri
+    - monad-logger
+    - mtl
+    - rainbow-hash
+    - rainbow-hash-ld
+    - random
+    - rdf4h
+    - servant
+    - servant-client
+    - servant-multipart
+    - servant-multipart-client
+    - servant-server
+    - temporary
+    - uuid
+    - wai
+    - warp
