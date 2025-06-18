@@ -1,14 +1,4 @@
 let
-  # pkgs = import <nixpkgs> { config = { allowBroken = true; }; }; # pin the channel to ensure reproducibility!
-  # pkgs = import (builtins.fetchGit {
-  #   # Descriptive name to make the store path easier to identify
-  #   name = "nixos-24.11-2025-02-04";
-  #   url = "https://github.com/nixos/nixpkgs/";
-  #   # Commit hash for nixos-unstable as of 2018-09-12
-  #   # `git ls-remote https://github.com/nixos/nixpkgs nixos-unstable`
-  #   ref = "refs/heads/nixos-24.11";
-  #   rev = "fecfeb86328381268e29e998ddd3ebc70bbd7f7c";
-  # }) {};
   pkgs = import (builtins.fetchTarball {
     # Descriptive name to make the store path easier to identify
     name = "nixos-unstable-2025-02-04";
@@ -17,21 +7,22 @@ let
     # Hash obtained using `nix-prefetch-url --unpack <url>`
     sha256 = "0m52nb9p4q468pgi1657dzcpsrxd1f15flxljaplxzjyiwbrzz5f";
   }) { config = { allowBroken = true; }; };
-
 in
 pkgs.haskellPackages.developPackage {
   root = ./.;
-  # overrides = final: prev: let
-  #   inherit (pkgs.haskell.lib) overrideCabal;
-  # in {
-  #   rdf4h = overrideCabal prev.rdf4h {
-  #     version = "5.0.1";
-  #     sha256 = "sha256-tmh5XWACl+TIp/1VoQe5gnssUsC8FMXqDWXiDmaRxmw=";
-  #   };
-  # };
+
+  source-overrides = {
+    rainbow-hash = pkgs.fetchFromGitHub {
+      owner = "tmciver";
+      repo = "rainbow-hash";
+      rev = "b6928339020e147a8075e07c979cabf270513de9";
+      hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
+    };
+  };
+
   overrides = final: prev:
     let
-      inherit (pkgs.haskell.lib) overrideCabal doJailbreak;
+      inherit (pkgs.haskell.lib) doJailbreak;
 
       hsparqlSrc = pkgs.fetchFromGitHub {
         owner = "tmciver";
@@ -39,26 +30,16 @@ pkgs.haskellPackages.developPackage {
         rev = "cca28da32a9da6fb0c3109d2601cfc3e43172c7c";
         hash = "sha256-mlNq3UtbxEXanLprhG7UE5678z4qudbdHbQYfW/84AI=";
       };
-      rainbowHashSrc = pkgs.fetchFromGitHub {
-        owner = "tmciver";
-        repo = "rainbow-hash";
-        rev = "d76f5f8f7e434221cfd618ee57709ca82f4ee19f";
-        hash = "sha256-0XMDnk9QlojlWrB0E/DLEDkm7wrV5z3G7OB3QlH14R4=";
-      };
     in {
-      # tls = overrideCabal prev.tls {
-      #   version = "1.6.0";
-      #   sha256 = "sha256-0p0gr8HBuFKjw5sHbshTy1lqyIjPUh5UFERB3saJ5Jg=";
-      # };
-      # connection = doJailbreak prev.connection;
       rdf4h = doJailbreak prev.rdf4h;
-      hsparql = pkgs.haskellPackages.callCabal2nix "hsparql" hsparqlSrc {};
-      rainbow-hash = pkgs.haskellPackages.callCabal2nix "rainbow-hash" rainbowHashSrc {};
+      hsparql = final.callCabal2nix "hsparql" hsparqlSrc {};
     };
-      
+
   modifier = drv:
     pkgs.haskell.lib.addBuildTools drv (with pkgs.haskellPackages;
-      [ cabal-install
-        ghcid
+      [cabal-install
+       ghcid
+       hasktags
+       stylish-haskell
       ]);
 }

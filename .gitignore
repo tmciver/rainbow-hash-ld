@@ -1,3 +1,6 @@
 result
 /dist-newstyle
+*.cabal
+TAGS
+.envrc
 *~
