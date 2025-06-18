@@ -1,25 +1,26 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module RainbowHash.Server (app) where
 
-import Protolude hiding (Handler)
+import           Protolude              hiding (Handler)
 
-import qualified Data.ByteString.Lazy as LBS
-import Data.Maybe (fromJust)
-import Network.HTTP.Media (MediaType)
-import Servant hiding (URI)
-import Servant.Multipart
-import Text.URI (URI, mkURI, render)
+import qualified Data.ByteString.Lazy   as LBS
+import           Data.Maybe             (fromJust)
+import           Network.HTTP.Media     (MediaType)
+import           Servant                hiding (URI)
+import           Servant.Multipart
+import           Text.URI               (URI, mkURI, render)
 
-import RainbowHash.App (runApp, appErrorToString, AppError)
-import RainbowHash.Config (getConfig)
-import RainbowHash.LinkedData (getRecentFiles, putFile, FileNodeCreateOption(..))
-import RainbowHash.View.File (File(..))
-import RainbowHash.View.Home (Home(..))
-import RainbowHash.View.HTML (HTML)
+import           RainbowHash.App        (AppError, appErrorToString, runApp)
+import           RainbowHash.Config     (getConfig)
+import           RainbowHash.LinkedData (FileNodeCreateOption (..),
+                                         getRecentFiles, putFile)
+import           RainbowHash.View.File  (File (..))
+import           RainbowHash.View.Home  (Home (..))
+import           RainbowHash.View.HTML  (HTML)
 
 newtype ServantURI = ServantURI { toURI :: URI }
 
@@ -39,7 +40,7 @@ homeHandler = do
   config <- liftIO getConfig
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
-    Left err -> throwError $ err500 { errBody = errToLBS err }
+    Left err          -> throwError $ err500 { errBody = errToLBS err }
     Right recentFiles -> pure $ Home (File <$> recentFiles)
 
   where
@@ -75,7 +76,7 @@ filesHandler multipartData = do
 
           either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
-            Left err -> throwError $ err500 { errBody = errToLBS err }
+            Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
 
         getTitle :: [Input] -> Maybe Text
@@ -94,7 +95,7 @@ filesHandler multipartData = do
                 isFileNodeCreationOption = (== "create-new-node") . iName
 
                 boolToFNCO :: Bool -> FileNodeCreateOption
-                boolToFNCO True = AlwaysCreate
+                boolToFNCO True  = AlwaysCreate
                 boolToFNCO False = CreateIfNotExists
 
         errToLBS :: AppError -> LBS.ByteString

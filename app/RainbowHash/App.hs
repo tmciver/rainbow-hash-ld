@@ -11,22 +11,28 @@ module RainbowHash.App
   , appErrorToString
   ) where
 
-import Protolude
+import           Protolude
 
-import Control.Monad.Catch (MonadMask, MonadCatch, MonadThrow)
-import Control.Monad.Logger (MonadLogger(..), toLogStr, fromLogStr)
-import Data.RDF (RDF, TList)
-import qualified Data.Text as T
-import qualified Data.Time.Clock as Time
-import System.FilePath (takeFileName)
+import           Control.Monad.Catch           (MonadCatch, MonadMask,
+                                                MonadThrow)
+import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
+                                                toLogStr)
+import           Data.RDF                      (RDF, TList)
+import qualified Data.Text                     as T
+import qualified Data.Time.Clock               as Time
+import           System.FilePath               (takeFileName)
 
-import RainbowHash.HTTPClient as HTTPClient (mapError, putFile, httpClientErrorToString, postToSPARQL, HTTPClientError)
-import RainbowHash.LinkedData
-import RainbowHash.Logger (writeLog)
-import RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
-import RainbowHash.RDF4H (fileDataToRDF)
-import qualified RainbowHash.HSPARQL as HSPARQL
-import RainbowHash.Config (Config(..))
+import           RainbowHash.Config            (Config (..))
+import qualified RainbowHash.HSPARQL           as HSPARQL
+import           RainbowHash.HTTPClient        as HTTPClient (HTTPClientError,
+                                                              httpClientErrorToString,
+                                                              mapError,
+                                                              postToSPARQL,
+                                                              putFile)
+import           RainbowHash.LinkedData
+import           RainbowHash.Logger            (writeLog)
+import           RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
+import           RainbowHash.RDF4H             (fileDataToRDF)
 
 newtype AppError = HTTPClientError HTTPClientError
   deriving (Show)

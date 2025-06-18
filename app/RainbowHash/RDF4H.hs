@@ -1,22 +1,24 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module RainbowHash.RDF4H
   ( fileDataToRDF
   ) where
 
-import Protolude
+import           Protolude
 
-import qualified Data.Map as Map
-import Data.RDF (Rdf, RDF, PrefixMappings(..), BaseUrl(..), triple, unode, lnode, plainL, typedL, mkRdf)
-import Data.UUID (toText)
-import Data.UUID.V4 (nextRandom)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Data.Time.Clock (UTCTime)
-import Data.Time.Format.ISO8601 (iso8601Show)
-import Network.HTTP.Media (MediaType, renderHeader)
-import Text.URI (URI, mkURI, render)
+import qualified Data.Map                 as Map
+import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
+                                           RDF, Rdf, lnode, mkRdf, plainL,
+                                           triple, typedL, unode)
+import qualified Data.Text                as T
+import qualified Data.Text.Encoding       as T
+import           Data.Time.Clock          (UTCTime)
+import           Data.Time.Format.ISO8601 (iso8601Show)
+import           Data.UUID                (toText)
+import           Data.UUID.V4             (nextRandom)
+import           Network.HTTP.Media       (MediaType, renderHeader)
+import           Text.URI                 (URI, mkURI, render)
 
 fileDataToRDF
   :: (Rdf a)

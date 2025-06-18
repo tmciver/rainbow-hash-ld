@@ -1,20 +1,20 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module RainbowHash.MediaTypeDiscover
   ( discoverMediaTypeBS
   , discoverMediaTypeFP
   ) where
 
-import Protolude
+import           Protolude
 
-import qualified Data.ByteString as BS
-import qualified Data.Text as T
+import qualified Data.ByteString    as BS
+import qualified Data.Text          as T
 import qualified Data.Text.Encoding as T
-import Magic
-import Network.HTTP.Media (MediaType, parseAccept, (//))
-import System.IO (hFlush)
-import System.IO.Temp (withSystemTempFile)
+import           Magic
+import           Network.HTTP.Media (MediaType, parseAccept, (//))
+import           System.IO          (hFlush)
+import           System.IO.Temp     (withSystemTempFile)
 
 defaultMediaType :: MediaType
 defaultMediaType = "application" // "octet-stream"

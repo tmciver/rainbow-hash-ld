@@ -11,15 +11,15 @@ module RainbowHash.LinkedData
   , FileNodeCreateOption(..)
   ) where
 
-import Protolude
+import           Protolude
 
-import Control.Monad.Logger (MonadLogger(..), logInfoN)
-import Data.Text.Encoding as T
-import Data.Time.Clock (UTCTime)
-import Network.HTTP.Media (MediaType, renderHeader)
-import Text.URI (URI, render)
+import           Control.Monad.Logger (MonadLogger (..), logInfoN)
+import           Data.Text.Encoding   as T
+import           Data.Time.Clock      (UTCTime)
+import           Network.HTTP.Media   (MediaType, renderHeader)
+import           Text.URI             (URI, render)
 
-import RainbowHash.File (File)
+import           RainbowHash.File     (File)
 
 data FileNodeCreateOption
   = AlwaysCreate

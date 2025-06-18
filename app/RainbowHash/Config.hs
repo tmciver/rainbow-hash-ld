@@ -1,19 +1,19 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module RainbowHash.Config
   ( getConfig
   , Config(..)
   ) where
 
-import Protolude
+import           Protolude
 
 -- use of fromJust will go away once we're no longer hard-coding data here.
-import Data.Maybe (fromJust)
-import Text.URI (mkURI, URI)
+import           Data.Maybe (fromJust)
+import           Text.URI   (URI, mkURI)
 
 data Config = Config
-  { blobStoreUrl :: URI
+  { blobStoreUrl   :: URI
   , sparqlEndpoint :: URI
   }
 

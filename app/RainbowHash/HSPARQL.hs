@@ -5,22 +5,23 @@ module RainbowHash.HSPARQL
   , getFileForContent
   ) where
 
-import Protolude
+import           Protolude
 
-import Control.Monad.Logger (LogLevel(LevelError, LevelDebug, LevelInfo))
-import Data.RDF (Node(..), LValue(..))
-import Data.Text (pack, unpack)
-import qualified Data.Text.Encoding as T
-import Data.Time (UTCTime)
-import Data.Time.Format.ISO8601 (iso8601ParseM)
-import Database.HSparql.QueryGenerator
-import Database.HSparql.Connection (BindingValue(..), selectQuery)
-import Network.HTTP.Media (MediaType, parseAccept)
-import Numeric.Natural (Natural)
-import Text.URI (URI, mkURI, render)
+import           Control.Monad.Logger            (LogLevel (LevelDebug, LevelError, LevelInfo))
+import           Data.RDF                        (LValue (..), Node (..))
+import           Data.Text                       (pack, unpack)
+import qualified Data.Text.Encoding              as T
+import           Data.Time                       (UTCTime)
+import           Data.Time.Format.ISO8601        (iso8601ParseM)
+import           Database.HSparql.Connection     (BindingValue (..),
+                                                  selectQuery)
+import           Database.HSparql.QueryGenerator
+import           Network.HTTP.Media              (MediaType, parseAccept)
+import           Numeric.Natural                 (Natural)
+import           Text.URI                        (URI, mkURI, render)
 
-import RainbowHash.File (File(..))
-import RainbowHash.Logger (writeLog)
+import           RainbowHash.File                (File (..))
+import           RainbowHash.Logger              (writeLog)
 
 data HsparqlError
   = BindingValueError BindingValueError
@@ -162,7 +163,7 @@ getRecentFiles sparqlEndpoint = do
         parseDateTimeNode (LNode (TypedL iso8601Text _)) =
           case iso8601ParseM (unpack iso8601Text) of
             Nothing -> throwError $ DateTimeParseError iso8601Text
-            Just t -> pure t
+            Just t  -> pure t
         parseDateTimeNode node = throwError $ BindingValueError $ NonLiteralNode node
 
         parseBoundNode
@@ -170,7 +171,7 @@ getRecentFiles sparqlEndpoint = do
           => (Node -> m a)
           -> BindingValue
           -> Maybe (m a)
-        parseBoundNode _ Unbound = Nothing
+        parseBoundNode _ Unbound      = Nothing
         parseBoundNode f (Bound node) = Just (f node)
 
         parseUnboundAsError
@@ -222,7 +223,7 @@ getFileForContent contentUrl sparqlEndpoint = do
   pure $ maybeBvss >>= toUri
   where toUri :: [[BindingValue]] -> Maybe URI
         toUri [[Bound (UNode uriText)]] = mkURI uriText
-        toUri _ = Nothing
+        toUri _                         = Nothing
 
 fileForContentQuery :: URI -> Query SelectQuery
 fileForContentQuery contentUrl = do

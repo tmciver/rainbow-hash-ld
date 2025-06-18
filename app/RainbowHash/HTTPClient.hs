@@ -1,7 +1,7 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module RainbowHash.HTTPClient
   ( putFile
@@ -11,21 +11,37 @@ module RainbowHash.HTTPClient
   , postToSPARQL
   ) where
 
-import Protolude
+import           Protolude
 
-import Control.Monad.Catch (MonadMask)
-import Control.Monad.Error (mapError)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
-import Data.RDF (Rdf, RDF, hWriteRdf, TurtleSerializer(..))
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Network.HTTP.Client (Request, Response, parseRequest, newManager, defaultManagerSettings, responseHeaders, httpNoBody, httpLbs, responseStatus, responseBody, requestHeaders, requestBody, RequestBody(RequestBodyBS))
-import Network.HTTP.Client.MultipartFormData (formDataBody, partFileSource)
-import Network.HTTP.Types (Header, hLocation, Status, statusIsSuccessful)
-import System.IO (hClose)
-import System.IO.Temp (withSystemTempFile)
-import Text.URI (URI, mkURI, render)
+import           Control.Monad.Catch                   (MonadMask)
+import           Control.Monad.Error                   (mapError)
+import qualified Data.ByteString                       as BS
+import qualified Data.ByteString.Lazy                  as LBS
+import           Data.RDF                              (RDF, Rdf,
+                                                        TurtleSerializer (..),
+                                                        hWriteRdf)
+import qualified Data.Text                             as T
+import qualified Data.Text.Encoding                    as T
+import           Network.HTTP.Client                   (Request,
+                                                        RequestBody (RequestBodyBS),
+                                                        Response,
+                                                        defaultManagerSettings,
+                                                        httpLbs, httpNoBody,
+                                                        newManager,
+                                                        parseRequest,
+                                                        requestBody,
+                                                        requestHeaders,
+                                                        responseBody,
+                                                        responseHeaders,
+                                                        responseStatus)
+import           Network.HTTP.Client.MultipartFormData (formDataBody,
+                                                        partFileSource)
+import           Network.HTTP.Types                    (Header, Status,
+                                                        hLocation,
+                                                        statusIsSuccessful)
+import           System.IO                             (hClose)
+import           System.IO.Temp                        (withSystemTempFile)
+import           Text.URI                              (URI, mkURI, render)
 
 data HTTPClientError
   = HeaderError HeaderError
@@ -59,9 +75,9 @@ data HeaderError
   deriving (Show)
 
 headerErrorToString :: HeaderError -> Text
-headerErrorToString HeaderNotFound = "The Location header was not found."
+headerErrorToString HeaderNotFound       = "The Location header was not found."
 headerErrorToString (UTF8DecodeError ue) = "URI decode error: " <> show ue
-headerErrorToString (URIImportError t) = "URI import error: " <> t
+headerErrorToString (URIImportError t)   = "URI import error: " <> t
 
 httpClientErrorToString :: HTTPClientError -> Text
 httpClientErrorToString (HeaderError he) = headerErrorToString he
@@ -97,7 +113,7 @@ getLocationHeader = findLocationVal >=> locationToURI
           let maybeHeader = find isLocation . responseHeaders $ resp
           in case maybeHeader of
             Just (_, loc) -> pure loc
-            Nothing -> throwError HeaderNotFound 
+            Nothing       -> throwError HeaderNotFound
 
         isLocation :: Header -> Bool
         isLocation (hdr, _) = hdr == hLocation
@@ -105,11 +121,11 @@ getLocationHeader = findLocationVal >=> locationToURI
         locationToURI :: MonadError HeaderError m => ByteString -> m URI
         locationToURI bs = do
           t <- case T.decodeUtf8' bs of
-            Right t' -> pure t'
+            Right t'  -> pure t'
             Left uErr -> throwError $ UTF8DecodeError uErr
           case mkURI t of
             Just url -> pure url
-            Nothing -> throwError $ URIImportError t
+            Nothing  -> throwError $ URIImportError t
 
 postToSPARQL
   :: ( Rdf a
@@ -169,7 +185,7 @@ postToSPARQL gspUri graph = do
           mgr <- liftIO $ newManager defaultManagerSettings
           (runExceptT $ mkSPARQLRequest gspUri fp)
             >>= (\eitherReq -> case eitherReq of
-                    Left err -> pure $ Left err
+                    Left err  -> pure $ Left err
                     Right req -> liftIO (httpLbs req mgr >>= responseToEither)
                 )
 
