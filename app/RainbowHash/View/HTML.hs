@@ -1,13 +1,13 @@
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module RainbowHash.View.HTML (HTML) where
 
-import Protolude
+import           Protolude
 
-import Lucid
-import Network.HTTP.Media ((//), (/:))
-import Servant (MimeRender(..), Accept(..))
+import           Lucid
+import           Network.HTTP.Media ((//), (/:))
+import           Servant            (Accept (..), MimeRender (..))
 
 data HTML
 

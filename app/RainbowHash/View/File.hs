@@ -2,19 +2,19 @@
 
 module RainbowHash.View.File (File(..)) where
 
-import Protolude
+import           Protolude
 
 import qualified Data.CaseInsensitive as CI
-import Data.Text.Encoding as T
-import Data.Text as T
-import Data.Time.Clock (UTCTime)
-import Data.Time.Format (formatTime, defaultTimeLocale)
-import Lucid
-import Lucid.Base (makeAttribute)
-import Network.HTTP.Media (MediaType, mainType, subType)
-import Text.URI (render)
+import           Data.Text            as T
+import           Data.Text.Encoding   as T
+import           Data.Time.Clock      (UTCTime)
+import           Data.Time.Format     (defaultTimeLocale, formatTime)
+import           Lucid
+import           Lucid.Base           (makeAttribute)
+import           Network.HTTP.Media   (MediaType, mainType, subType)
+import           Text.URI             (render)
 
-import qualified RainbowHash.File as RH
+import qualified RainbowHash.File     as RH
 
 newtype File = File RH.File
 

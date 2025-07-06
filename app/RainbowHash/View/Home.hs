@@ -1,13 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module RainbowHash.View.Home (Home(..)) where
 
-import Protolude hiding (for_)
+import           Protolude             hiding (for_)
 
-import Lucid
+import           Lucid
 
-import RainbowHash.View.File (File(..))
+import           RainbowHash.View.File (File (..))
 
 data Home = Home [File]
 

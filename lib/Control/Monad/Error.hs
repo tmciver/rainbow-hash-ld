@@ -1,6 +1,6 @@
 module Control.Monad.Error (mapError) where
 
-import Protolude
+import           Protolude
 
 mapError
   :: MonadError e' m
@@ -10,5 +10,5 @@ mapError
 mapError f ex = do
   either' <- runExceptT ex
   case either' of
-    Left e -> throwError (f e)
+    Left e  -> throwError (f e)
     Right v -> pure v
