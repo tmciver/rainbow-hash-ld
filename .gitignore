@@ -1,6 +1,8 @@
 result
 /dist-newstyle
+/dist
 *.cabal
 TAGS
 .envrc
+.dir-locals.el
 *~
