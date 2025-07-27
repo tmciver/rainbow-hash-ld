@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module RainbowHash.View.UploadForm (UploadForm(..)) where
+module RainbowHash.View.Home (Home(..)) where
 
 import           Protolude             hiding (for_)
 
@@ -9,10 +9,10 @@ import           Lucid
 
 import           RainbowHash.View.File (File (..))
 
-newtype UploadForm = UploadForm [File]
+data Home = Home [File]
 
-instance ToHtml UploadForm where
-  toHtml (UploadForm files) = html_ $ do
+instance ToHtml Home where
+  toHtml (Home files) = html_ $ do
     head_ $ do
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "static/style.css"]

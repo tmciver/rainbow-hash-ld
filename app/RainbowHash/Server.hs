@@ -5,45 +5,43 @@
 
 module RainbowHash.Server (app) where
 
-import           Protolude                   hiding (Handler)
+import           Protolude              hiding (Handler)
 
-import qualified Data.ByteString.Lazy        as LBS
-import           Data.Maybe                  (fromJust)
-import           Network.HTTP.Media          (MediaType)
-import           Servant                     hiding (URI)
+import qualified Data.ByteString.Lazy   as LBS
+import           Data.Maybe             (fromJust)
+import           Network.HTTP.Media     (MediaType)
+import           Servant                hiding (URI)
 import           Servant.Multipart
-import           Text.URI                    (URI, mkURI, render)
+import           Text.URI               (URI, mkURI, render)
 
-import           RainbowHash.App             (AppError, appErrorToString,
-                                              runApp)
-import           RainbowHash.Config          (getConfig)
-import           RainbowHash.LinkedData      (FileNodeCreateOption (..),
-                                              getRecentFiles, putFile)
-import           RainbowHash.View.File       (File (..))
-import           RainbowHash.View.HTML       (HTML)
-import           RainbowHash.View.UploadForm (UploadForm (..))
+import           RainbowHash.App        (AppError, appErrorToString, runApp)
+import           RainbowHash.Config     (getConfig)
+import           RainbowHash.LinkedData (FileNodeCreateOption (..),
+                                         getRecentFiles, putFile)
+import           RainbowHash.View.File  (File (..))
+import           RainbowHash.View.Home  (Home (..))
+import           RainbowHash.View.HTML  (HTML)
 
 newtype ServantURI = ServantURI { toURI :: URI }
 
 instance ToHttpApiData ServantURI where
   toUrlPiece = render . toURI
 
-type FilesAPI =
-       "upload-form" :> Get '[HTML] UploadForm
-  :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
-               :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
-  :<|> "static" :> Raw
+type FilesAPI = Get '[HTML] Home
+           :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
+                        :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
+           :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
 api = Proxy
 
-homeHandler :: Handler UploadForm
+homeHandler :: Handler Home
 homeHandler = do
   config <- liftIO getConfig
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ UploadForm (File <$> recentFiles)
+    Right recentFiles -> pure $ Home (File <$> recentFiles)
 
   where
     errToLBS :: AppError -> LBS.ByteString

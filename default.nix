@@ -41,6 +41,5 @@ pkgs.haskellPackages.developPackage {
        ghcid
        hasktags
        stylish-haskell
-       hlint
       ]);
 }

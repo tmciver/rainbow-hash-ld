@@ -20,7 +20,7 @@ data Config = Config
 getConfig :: IO Config
 getConfig = do
   let blobStorageUrl :: URI
-      blobStorageUrl = "http://localhost:3000/blobs" & mkURI & fromJust
+      blobStorageUrl = "http://localhost:3002/blobs" & mkURI & fromJust
       sparqlEndpoint :: URI
       sparqlEndpoint = "http://localhost:3030/ds" & mkURI & fromJust
   pure $ Config blobStorageUrl sparqlEndpoint
