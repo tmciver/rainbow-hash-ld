@@ -27,7 +27,7 @@ newtype ServantURI = ServantURI { toURI :: URI }
 instance ToHttpApiData ServantURI where
   toUrlPiece = render . toURI
 
-type FilesAPI = Get '[HTML] Home
+type FilesAPI = Header "X-SSL-CERT" Text :> Get '[HTML] Home
            :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
                         :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
            :<|> "static" :> Raw
@@ -35,8 +35,13 @@ type FilesAPI = Get '[HTML] Home
 api :: Proxy FilesAPI
 api = Proxy
 
-homeHandler :: Handler Home
-homeHandler = do
+-- newtype ClientCert = ClientCert Text
+
+homeHandler :: Maybe Text -> Handler Home
+homeHandler mCert = do
+  liftIO $ case mCert of
+    Just cert -> putStrLn cert
+    Nothing   -> putStrLn ("No header X-SSL-CERT found." :: Text)
   config <- liftIO getConfig
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
