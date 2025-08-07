@@ -12,12 +12,14 @@ import           Data.Maybe             (fromJust)
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
+import qualified Text.URI               as URI
 import           Text.URI               (URI, mkURI, render)
 
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (getConfig)
 import           RainbowHash.LinkedData (FileNodeCreateOption (..),
                                          getRecentFiles, putFile)
+import           RainbowHash.Servant    (WebID, WebIDAuth, genAuthServerContext)
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
@@ -27,7 +29,7 @@ newtype ServantURI = ServantURI { toURI :: URI }
 instance ToHttpApiData ServantURI where
   toUrlPiece = render . toURI
 
-type FilesAPI = Header "X-SSL-CERT" Text :> Get '[HTML] Home
+type FilesAPI = WebIDAuth :> Get '[HTML] Home
            :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
                         :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
            :<|> "static" :> Raw
@@ -37,11 +39,9 @@ api = Proxy
 
 -- newtype ClientCert = ClientCert Text
 
-homeHandler :: Maybe Text -> Handler Home
-homeHandler mCert = do
-  liftIO $ case mCert of
-    Just cert -> putStrLn cert
-    Nothing   -> putStrLn ("No header X-SSL-CERT found." :: Text)
+homeHandler :: WebID -> Handler Home
+homeHandler webID = do
+  liftIO $ putStrLn $ ("WebID is: " :: Text) <> URI.render webID
   config <- liftIO getConfig
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
@@ -113,4 +113,4 @@ server :: Server FilesAPI
 server = homeHandler :<|> filesHandler :<|> staticHandler
 
 app :: Application
-app = serve api server
+app = serveWithContext api genAuthServerContext server

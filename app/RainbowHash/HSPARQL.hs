@@ -7,7 +7,7 @@ module RainbowHash.HSPARQL
 
 import           Protolude
 
-import           Control.Monad.Logger            (LogLevel (LevelDebug, LevelError, LevelInfo))
+import           Control.Monad.Logger            (LogLevel (LevelDebug, LevelError))
 import           Data.RDF                        (LValue (..), Node (..))
 import           Data.Text                       (pack, unpack)
 import qualified Data.Text.Encoding              as T
@@ -85,7 +85,7 @@ getRecentFiles sparqlEndpoint = do
           => [BindingValue]
           -> m File
         toFile [fileUriBV, fileNameBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
-          fileUri <- getUri fileUriBV
+          fileUri' <- getUri fileUriBV
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           maybeTitle <- getPlainLiteralMaybe titleBV
           maybeDesc <- getPlainLiteralMaybe descBV
@@ -94,7 +94,7 @@ getRecentFiles sparqlEndpoint = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri maybeFileName maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
+          pure $ File fileUri' maybeFileName maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
 
         getUri
