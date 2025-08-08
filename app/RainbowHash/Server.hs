@@ -8,12 +8,11 @@ module RainbowHash.Server (app) where
 import           Protolude              hiding (Handler)
 
 import qualified Data.ByteString.Lazy   as LBS
-import           Data.Maybe             (fromJust)
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
 import qualified Text.URI               as URI
-import           Text.URI               (URI, mkURI, render)
+import           Text.URI               (URI, render)
 
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (getConfig)
@@ -29,19 +28,19 @@ newtype ServantURI = ServantURI { toURI :: URI }
 instance ToHttpApiData ServantURI where
   toUrlPiece = render . toURI
 
-type FilesAPI = WebIDAuth :> Get '[HTML] Home
-           :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
-                        :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent)
-           :<|> "static" :> Raw
+type FilesAPI =
+  WebIDAuth :>
+  (Get '[HTML] Home
+    :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
+                 :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent))
+  :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
 api = Proxy
 
--- newtype ClientCert = ClientCert Text
-
 homeHandler :: WebID -> Handler Home
 homeHandler webID = do
-  liftIO $ putStrLn $ ("WebID is: " :: Text) <> URI.render webID
+  --liftIO $ putStrLn $ ("WebID is: " :: Text) <> URI.render webID
   config <- liftIO getConfig
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
@@ -53,9 +52,10 @@ homeHandler webID = do
     errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
 filesHandler
-  :: MultipartData Tmp
+  :: WebID
+  -> MultipartData Tmp
   -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-filesHandler multipartData = do
+filesHandler webId multipartData = do
   case files multipartData of
     [fileData] -> uploadFile fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
@@ -73,13 +73,10 @@ filesHandler multipartData = do
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
-              -- FIXME: agentUri should come from client
-              agentUri :: URI
-              agentUri = "http://timmciver.com/me#" & mkURI & fromJust
 
           config <- liftIO getConfig
 
-          either' <- liftIO $ runApp (putFile filePath agentUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath webId maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
@@ -110,7 +107,7 @@ staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
 server :: Server FilesAPI
-server = homeHandler :<|> filesHandler :<|> staticHandler
+server = (\webId -> homeHandler webId :<|> filesHandler webId) :<|> staticHandler
 
 app :: Application
 app = serveWithContext api genAuthServerContext server
