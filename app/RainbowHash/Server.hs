@@ -11,7 +11,6 @@ import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
-import qualified Text.URI               as URI
 import           Text.URI               (URI, render)
 
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
@@ -39,9 +38,9 @@ api :: Proxy FilesAPI
 api = Proxy
 
 homeHandler :: WebID -> Handler Home
-homeHandler webID = do
-  --liftIO $ putStrLn $ ("WebID is: " :: Text) <> URI.render webID
+homeHandler _ = do
   config <- liftIO getConfig
+  -- TODO: getRecentfiles should take the WebID to determine what files the user can see.
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
@@ -57,14 +56,15 @@ filesHandler
   -> Handler (Headers '[Header "Location" ServantURI] NoContent)
 filesHandler webId multipartData = do
   case files multipartData of
-    [fileData] -> uploadFile fileData (inputs multipartData)
+    [fileData] -> uploadFile webId fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
-          :: FileData Tmp
+          :: WebID
+          -> FileData Tmp
           -> [Input]
           -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-        uploadFile fileData fields = do
+        uploadFile webId' fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -76,7 +76,7 @@ filesHandler webId multipartData = do
 
           config <- liftIO getConfig
 
-          either' <- liftIO $ runApp (putFile filePath webId maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath webId' maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
@@ -92,7 +92,7 @@ filesHandler webId multipartData = do
                 isDescription = (== "description") . iName
 
         getFileNodeCreationOption :: [Input] -> FileNodeCreateOption
-        getFileNodeCreationOption = boolToFNCO . fromMaybe False . (<&> (== "1") . iValue) . find isFileNodeCreationOption
+        getFileNodeCreationOption = boolToFNCO . maybe False ((== "1") . iValue) . find isFileNodeCreationOption
           where isFileNodeCreationOption :: Input -> Bool
                 isFileNodeCreationOption = (== "create-new-node") . iName
 
