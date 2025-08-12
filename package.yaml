@@ -40,6 +40,8 @@ executable:
     - bytestring
     - case-insensitive
     - containers
+    - crypton-x509
+    - crypton-pem
     - exceptions
     - filepath
     - hsparql

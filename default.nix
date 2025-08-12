@@ -18,6 +18,12 @@ pkgs.haskellPackages.developPackage {
       rev = "b6928339020e147a8075e07c979cabf270513de9";
       hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
     };
+    crypton-pem = pkgs.fetchFromGitHub {
+      owner = "mpilgrem";
+      repo = "crypton-pem";
+      rev = "b025588fda5cd64b0cd74989f646ee3bab34395e";
+      hash = "sha256-1aSKiS7AR+MLQhJVyTIT49/owMgZGkkX74K55tZeGo0=";
+    };
   };
 
   overrides = final: prev:
