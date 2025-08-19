@@ -1,6 +1,9 @@
 result
+/dist
 /dist-newstyle
 *.cabal
 TAGS
 .envrc
+.dir-locals.el
+flycheck_*
 *~
