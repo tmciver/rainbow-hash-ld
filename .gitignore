@@ -7,3 +7,4 @@ TAGS
 .dir-locals.el
 flycheck_*
 *~
+.aider*
