@@ -14,7 +14,7 @@ import           Servant.Multipart
 import           Text.URI               (URI, render)
 
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
-import           RainbowHash.Config     (getConfig)
+import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..),
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebID, WebIDAuth, genAuthServerContext)
@@ -37,9 +37,8 @@ type FilesAPI =
 api :: Proxy FilesAPI
 api = Proxy
 
-homeHandler :: WebID -> Handler Home
-homeHandler _ = do
-  config <- liftIO getConfig
+homeHandler :: Config -> WebID -> Handler Home
+homeHandler config _ = do
   -- TODO: getRecentfiles should take the WebID to determine what files the user can see.
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
@@ -51,10 +50,11 @@ homeHandler _ = do
     errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
 filesHandler
-  :: WebID
+  :: Config
+  -> WebID
   -> MultipartData Tmp
   -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-filesHandler webId multipartData = do
+filesHandler config webId multipartData = do
   case files multipartData of
     [fileData] -> uploadFile webId fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
@@ -73,8 +73,6 @@ filesHandler webId multipartData = do
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
-
-          config <- liftIO getConfig
 
           either' <- liftIO $ runApp (putFile filePath webId' maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
@@ -106,8 +104,8 @@ filesHandler webId multipartData = do
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
-server :: Server FilesAPI
-server = (\webId -> homeHandler webId :<|> filesHandler webId) :<|> staticHandler
+server :: Config -> Server FilesAPI
+server config = (\webId -> homeHandler config webId :<|> filesHandler config webId) :<|> staticHandler
 
-app :: Application
-app = serveWithContext api genAuthServerContext server
+app :: Config -> Application
+app config = serveWithContext api genAuthServerContext (server config)

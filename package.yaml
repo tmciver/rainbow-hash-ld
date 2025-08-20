@@ -53,6 +53,7 @@ executable:
     - modern-uri
     - monad-logger
     - mtl
+    - optparse-applicative
     - rainbow-hash
     - rainbow-hash-ld
     - random

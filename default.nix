@@ -3,9 +3,9 @@ let
     # Descriptive name to make the store path easier to identify
     name = "nixos-unstable-2025-02-04";
     # Commit hash for nixos-unstable as of 2018-09-12
-    url = "https://github.com/nixos/nixpkgs/archive/fecfeb86328381268e29e998ddd3ebc70bbd7f7c.tar.gz";
+    url = "https://github.com/nixos/nixpkgs/archive/32f313e49e42f715491e1ea7b306a87c16fe0388.tar.gz";
     # Hash obtained using `nix-prefetch-url --unpack <url>`
-    sha256 = "0m52nb9p4q468pgi1657dzcpsrxd1f15flxljaplxzjyiwbrzz5f";
+    sha256 = "1z4ga87qla5300qwib3dnjnkaywwh8y1qqsb8w2mrsrw78k9xmlw";
   }) { config = { allowBroken = true; }; };
 in
 pkgs.haskellPackages.developPackage {
@@ -15,8 +15,8 @@ pkgs.haskellPackages.developPackage {
     rainbow-hash = pkgs.fetchFromGitHub {
       owner = "tmciver";
       repo = "rainbow-hash";
-      rev = "b6928339020e147a8075e07c979cabf270513de9";
-      hash = "sha256-nlUOOCSHB7ttB4vsvtJMRiMq8ac4opm+L98VCXvNUH4=";
+      rev = "6b5dd642332f71256a80fa2abca222272c204d32";
+      hash = "sha256-b+n4HIj+RdCB8FlfGn8cNogNMoXbCE81D8my7kuyeY0=";
     };
     crypton-pem = pkgs.fetchFromGitHub {
       owner = "mpilgrem";
@@ -33,8 +33,8 @@ pkgs.haskellPackages.developPackage {
       hsparqlSrc = pkgs.fetchFromGitHub {
         owner = "tmciver";
         repo = "hsparql";
-        rev = "cca28da32a9da6fb0c3109d2601cfc3e43172c7c";
-        hash = "sha256-mlNq3UtbxEXanLprhG7UE5678z4qudbdHbQYfW/84AI=";
+        rev = "4c65cc1069c1fe296a23d189c6cf10d27a9ec817";
+        hash = "sha256-EXgv74dtCaKLBZTIP5gFFgQIvwRWgEj2mdyqSgm0Wl8=";
       };
     in {
       rdf4h = doJailbreak prev.rdf4h;
@@ -47,5 +47,7 @@ pkgs.haskellPackages.developPackage {
        ghcid
        hasktags
        stylish-haskell
+       hpack
+       pkgs.aider-chat
       ]);
 }
