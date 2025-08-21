@@ -36,6 +36,19 @@ library:
 executable:
   main: Main.hs
   source-dirs: app
+  other-modules:
+    - RainbowHash.App
+    - RainbowHash.Config
+    - RainbowHash.HSPARQL
+    - RainbowHash.HTTPClient
+    - RainbowHash.MediaTypeDiscover
+    - RainbowHash.Options
+    - RainbowHash.RDF4H
+    - RainbowHash.Servant
+    - RainbowHash.Server
+    - RainbowHash.View.File
+    - RainbowHash.View.HTML
+    - RainbowHash.View.Home
   dependencies:
     - bytestring
     - case-insensitive
