@@ -7,7 +7,8 @@
 
 module RainbowHash.Servant
   ( WebID
-  , WebIDAuth
+  , User(..)
+  , WebIDUserAuth
   , genAuthServerContext
   ) where
 
@@ -31,14 +32,16 @@ import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
 import           Text.URI                         (URI, mkURI)
 
 type WebID = URI
-type WebIDAuth = AuthProtect "webid-auth"
+data User = User
+  { webId :: WebID
+  }
+type WebIDUserAuth = AuthProtect "webid-auth"
+type instance AuthServerData WebIDUserAuth = User
 
-type instance AuthServerData WebIDAuth = WebID
-
-getWebID :: ByteString -> Handler WebID
-getWebID bs = do
+validateUser :: ByteString -> Handler User
+validateUser bs = do
   let decodedBS = urlDecode True bs
-  parsePEM decodedBS >>= getCertificate >>= getAltName >>= getWebIdFromAltName
+  parsePEM decodedBS >>= getCertificate >>= getAltName >>= getWebIdFromAltName >>= validateWebProfile
 
     where
       parsePEM :: ByteString -> Handler PEM
@@ -68,23 +71,26 @@ getWebID bs = do
           Nothing -> throwError $ err400 { errBody = "Could not parse a URI from the given text: " <>  Char8.pack uriText }
       getWebIdFromAltName san = throwError $ err400 { errBody = "Could not read a WebID from the given subject alternative name: " <> show san }
 
+      validateWebProfile :: WebID -> Handler User
+      validateWebProfile = pure . User
+
 --- | The auth handler wraps a function from Request -> Handler WebID.
 --- We look for the client certificate in the X-SSL-CERT request header.
 --- The client certificate text is then passed to our `getWebid` function.
-authHandler :: AuthHandler Request WebID
+authHandler :: AuthHandler Request User
 authHandler = mkAuthHandler handler
   where
     throw401 msg = throwError $ err401 { errBody = msg }
-    handler :: Request -> Handler WebID
+    handler :: Request -> Handler User
     handler req =
       req & requestHeaders
           & Map.fromList
           & Map.lookup "X-SSL-CERT"
           & maybeToEither "Missing X-SSL-CERT header"
-          & either throw401 getWebID
+          & either throw401 validateUser
 
 -- | The context that will be made available to request handlers. We supply the
 -- "cookie-auth"-tagged request handler defined above, so that the 'HasServer' instance
 -- of 'AuthProtect' can extract the handler and run it on the request.
-genAuthServerContext :: Context (AuthHandler Request WebID ': '[])
+genAuthServerContext :: Context (AuthHandler Request User ': '[])
 genAuthServerContext = authHandler :. EmptyContext
