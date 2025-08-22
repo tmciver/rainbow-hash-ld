@@ -20,6 +20,7 @@ import           Data.UUID.V4             (nextRandom)
 import           Network.HTTP.Media       (MediaType, renderHeader)
 import           Text.URI                 (URI, mkURI, render)
 
+-- TODO: Make this generic. It doesn't appear to need IO.
 fileDataToRDF
   :: (Rdf a)
   => URI -- ^URI to the bytes of the file content.
@@ -31,6 +32,7 @@ fileDataToRDF
   -> MediaType
   -> IO (URI, RDF a)
 fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = do
+  -- FIXME: Replace example.com
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
 

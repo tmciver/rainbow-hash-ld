@@ -41,7 +41,7 @@ type instance AuthServerData WebIDUserAuth = User
 validateUser :: ByteString -> Handler User
 validateUser bs = do
   let decodedBS = urlDecode True bs
-  parsePEM decodedBS >>= getCertificate >>= getAltName >>= getWebIdFromAltName >>= validateWebProfile
+  parsePEM decodedBS >>= getCertificate >>= validateWebProfile
 
     where
       parsePEM :: ByteString -> Handler PEM
@@ -71,8 +71,13 @@ validateUser bs = do
           Nothing -> throwError $ err400 { errBody = "Could not parse a URI from the given text: " <>  Char8.pack uriText }
       getWebIdFromAltName san = throwError $ err400 { errBody = "Could not read a WebID from the given subject alternative name: " <> show san }
 
-      validateWebProfile :: WebID -> Handler User
-      validateWebProfile = pure . User
+      validateWebProfile :: X509.Certificate -> Handler User
+      validateWebProfile cert = do
+        webId' <- getAltName cert >>= getWebIdFromAltName
+        eitherRes <- liftIO $ HTTP.run HTTP.validateClientCert webId' cert
+        case eitherRes of
+          Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> show e }
+          Right user -> pure user
 
 --- | The auth handler wraps a function from Request -> Handler WebID.
 --- We look for the client certificate in the X-SSL-CERT request header.
