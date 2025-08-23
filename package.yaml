@@ -46,6 +46,7 @@ executable:
     - RainbowHash.RDF4H
     - RainbowHash.Servant
     - RainbowHash.Server
+    - RainbowHash.User
     - RainbowHash.View.File
     - RainbowHash.View.HTML
     - RainbowHash.View.Home

@@ -17,7 +17,8 @@ import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..),
                                          getRecentFiles, putFile)
-import           RainbowHash.Servant    (User(..), WebIDUserAuth, genAuthServerContext)
+import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
+import           RainbowHash.User (User(..))
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
@@ -56,15 +57,14 @@ filesHandler
   -> Handler (Headers '[Header "Location" ServantURI] NoContent)
 filesHandler config user multipartData = do
   case files multipartData of
-    [fileData] -> uploadFile user fileData (inputs multipartData)
+    [fileData] -> uploadFile fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
-          :: User
-          -> FileData Tmp
+          :: FileData Tmp
           -> [Input]
           -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-        uploadFile (User webId') fileData fields = do
+        uploadFile fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -74,7 +74,7 @@ filesHandler config user multipartData = do
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
 
-          either' <- liftIO $ runApp (putFile filePath webId' maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath (webId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent

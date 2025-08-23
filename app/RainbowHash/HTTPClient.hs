@@ -2,20 +2,26 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module RainbowHash.HTTPClient
   ( putFile
+  , HTTPApp
+  , run
   , HTTPClientError(..)
   , mapError
   , httpClientErrorToString
   , postToSPARQL
+  , validateUser
   ) where
 
-import           Protolude
+import           Protolude hiding (exponent)
 
 import           Control.Monad.Catch                   (MonadMask)
 import           Control.Monad.Error                   (mapError)
 import qualified Data.ByteString                       as BS
+import qualified Data.X509                             as X509
 import qualified Data.ByteString.Lazy                  as LBS
 import           Data.RDF                              (RDF, Rdf,
                                                         TurtleSerializer (..),
@@ -43,10 +49,19 @@ import           System.IO                             (hClose)
 import           System.IO.Temp                        (withSystemTempFile)
 import           Text.URI                              (URI, mkURI, render)
 
+import           RainbowHash.User (WebID, User(..))
+
+newtype HTTPApp a = HTTPApp { getExceptT :: ExceptT HTTPClientError IO a }
+  deriving (Functor, Applicative, Monad, MonadError HTTPClientError)
+
+run :: HTTPApp a -> IO (Either HTTPClientError a)
+run = runExceptT . getExceptT
+
 data HTTPClientError
   = HeaderError HeaderError
   | ResponseError Status Text
   | RequestError Text
+  | Unauthorized Text
   deriving (Show)
 
 putFile
@@ -83,6 +98,7 @@ httpClientErrorToString :: HTTPClientError -> Text
 httpClientErrorToString (HeaderError he) = headerErrorToString he
 httpClientErrorToString (ResponseError status msg) = "HTTP response error. Status code: " <> show status <> ", message: " <> msg
 httpClientErrorToString (RequestError reqText) = "Could not create a HTTP request from \"" <> reqText <> "\""
+httpClientErrorToString (Unauthorized t) = "Unauthorized: " <> t
 
 checkStatusWithTextMessage
   :: MonadError HTTPClientError m
@@ -194,3 +210,40 @@ postToSPARQL gspUri graph = do
           => Response LBS.ByteString
           -> m (Either HTTPClientError ())
         responseToEither = pure . checkStatusWithTextMessage (T.take 100 . T.decodeUtf8 . LBS.toStrict)
+
+data ProfileData = ProfileData
+  { modulus :: Integer
+  , exponent :: Integer
+  , firstName :: Text
+  , lastName :: Text
+  }
+
+getProfileData
+  :: MonadError HTTPClientError m
+  => WebID
+  -> m ProfileData
+getProfileData = undefined
+
+validateCert
+  :: X509.Certificate
+  -> Integer
+  -> Integer
+  -> Bool
+validateCert = undefined
+
+validateUser
+  :: MonadError HTTPClientError m
+  => WebID
+  -> X509.Certificate
+  -> m User
+validateUser webId' cert = do
+  -- 1. fetch user's profile document
+  ProfileData{..} <- getProfileData webId'
+
+  -- 2. compare the modulus and exponent to that in the certificate
+  let validated = validateCert cert modulus exponent
+
+  -- 3. if they validate, return user.
+  if validated
+    then pure $ User webId' firstName lastName
+    else throwError $ Unauthorized "Certificate did not validate against profile data."

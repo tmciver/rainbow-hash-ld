@@ -19,7 +19,6 @@ import qualified Data.ByteString.Lazy.Char8       as Char8
 import qualified Data.Map                         as Map
 import           Data.PEM                         (PEM, pemContent, pemParseLBS)
 import qualified Data.Text                        as T
---import qualified Data.Text.Encoding               as T
 import qualified Data.X509                        as X509
 import           Network.HTTP.Types               (urlDecode)
 import           Network.Wai                      (Request, requestHeaders)
@@ -29,12 +28,11 @@ import           Servant.Server                   (Context (EmptyContext, (:.)),
                                                    err400, err401, errBody)
 import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
                                                    mkAuthHandler)
-import           Text.URI                         (URI, mkURI)
+import           Text.URI                         (mkURI)
 
-type WebID = URI
-data User = User
-  { webId :: WebID
-  }
+import RainbowHash.User (User, WebID)
+import qualified RainbowHash.HTTPClient as HTTP
+
 type WebIDUserAuth = AuthProtect "webid-auth"
 type instance AuthServerData WebIDUserAuth = User
 
@@ -74,7 +72,7 @@ validateUser bs = do
       validateWebProfile :: X509.Certificate -> Handler User
       validateWebProfile cert = do
         webId' <- getAltName cert >>= getWebIdFromAltName
-        eitherRes <- liftIO $ HTTP.run HTTP.validateClientCert webId' cert
+        eitherRes <- liftIO . HTTP.run $ HTTP.validateUser webId' cert
         case eitherRes of
           Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> show e }
           Right user -> pure user
