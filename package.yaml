@@ -39,6 +39,7 @@ executable:
   other-modules:
     - RainbowHash.App
     - RainbowHash.Config
+    - RainbowHash.Crypto
     - RainbowHash.HSPARQL
     - RainbowHash.HTTPClient
     - RainbowHash.MediaTypeDiscover
@@ -54,6 +55,7 @@ executable:
     - bytestring
     - case-insensitive
     - containers
+    - crypton
     - crypton-x509
     - crypton-pem
     - exceptions

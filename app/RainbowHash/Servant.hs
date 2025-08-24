@@ -7,7 +7,6 @@
 
 module RainbowHash.Servant
   ( WebID
-  , User(..)
   , WebIDUserAuth
   , genAuthServerContext
   ) where
@@ -19,6 +18,7 @@ import qualified Data.ByteString.Lazy.Char8       as Char8
 import qualified Data.Map                         as Map
 import           Data.PEM                         (PEM, pemContent, pemParseLBS)
 import qualified Data.Text                        as T
+import qualified Data.Text.Encoding                    as T
 import qualified Data.X509                        as X509
 import           Network.HTTP.Types               (urlDecode)
 import           Network.Wai                      (Request, requestHeaders)
@@ -31,7 +31,7 @@ import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
 import           Text.URI                         (mkURI)
 
 import RainbowHash.User (User, WebID)
-import qualified RainbowHash.HTTPClient as HTTP
+import qualified RainbowHash.Crypto as Crypto
 
 type WebIDUserAuth = AuthProtect "webid-auth"
 type instance AuthServerData WebIDUserAuth = User
@@ -72,9 +72,9 @@ validateUser bs = do
       validateWebProfile :: X509.Certificate -> Handler User
       validateWebProfile cert = do
         webId' <- getAltName cert >>= getWebIdFromAltName
-        eitherRes <- liftIO . HTTP.run $ HTTP.validateUser webId' cert
+        eitherRes <- liftIO . Crypto.run $ Crypto.validateUser webId' cert
         case eitherRes of
-          Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> show e }
+          Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . Crypto.errorToText $ e) }
           Right user -> pure user
 
 --- | The auth handler wraps a function from Request -> Handler WebID.
