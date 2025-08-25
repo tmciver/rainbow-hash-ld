@@ -13,7 +13,7 @@ module RainbowHash.Crypto
   , errorToText
   ) where
 
-import Protolude
+import Protolude hiding (exponent)
 
 import qualified Crypto.PubKey.RSA as Crypto
 import qualified Data.X509                             as X509
@@ -23,7 +23,7 @@ import           RainbowHash.User (WebID, User(..))
 import qualified RainbowHash.HTTPClient as HTTP
 
 newtype CryptoApp a = CryptoApp { getExceptT :: ExceptT CryptoError IO a }
-  deriving (Functor, Applicative, Monad, MonadError CryptoError)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError CryptoError)
 
 run :: CryptoApp a -> IO (Either CryptoError a)
 run = runExceptT . getExceptT
@@ -55,7 +55,9 @@ validateCert cert mod' exp' = do
     else throwError $ Unauthorized "Certificate did not validate against profile data."
 
 validateUser
-  :: MonadError CryptoError m
+  :: ( MonadError CryptoError m
+     , MonadIO m
+     )
   => WebID
   -> X509.Certificate
   -> m User

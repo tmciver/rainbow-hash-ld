@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 
 module RainbowHash.HTTPClient
   ( putFile
@@ -23,9 +24,11 @@ import           Control.Monad.Catch                   (MonadMask)
 import           Control.Monad.Error                   (mapError)
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Lazy                  as LBS
-import           Data.RDF                              (RDF, Rdf,
+import           Data.RDF                              (ParseFailure, RDF, Rdf,
                                                         TurtleSerializer (..),
+                                                        TurtleParser(..),
                                                         hWriteRdf)
+import qualified           Data.RDF as RDF
 import qualified Data.Text                             as T
 import qualified Data.Text.Encoding                    as T
 import           Network.HTTP.Client                   (Request,
@@ -61,6 +64,7 @@ data HTTPClientError
   = HeaderError HeaderError
   | ResponseError Status Text
   | RequestError Text
+  | RDFParseError ParseFailure
   deriving (Show)
 
 putFile
@@ -97,6 +101,7 @@ httpClientErrorToString :: HTTPClientError -> Text
 httpClientErrorToString (HeaderError he) = headerErrorToString he
 httpClientErrorToString (ResponseError status msg) = "HTTP response error. Status code: " <> show status <> ", message: " <> msg
 httpClientErrorToString (RequestError reqText) = "Could not create a HTTP request from \"" <> reqText <> "\""
+httpClientErrorToString (RDFParseError e) = "RDF Parse error: " <> show e
 
 checkStatusWithTextMessage
   :: MonadError HTTPClientError m
@@ -216,8 +221,33 @@ data ProfileData = ProfileData
   , lastName :: Text
   }
 
-getProfileData
+getProfileGraph
+  :: ( Rdf a
+     , MonadError HTTPClientError m
+     , MonadIO m
+     )
+  => WebID
+  -> m (RDF a)
+getProfileGraph webId' = do
+  let url = toS . render $ webId'
+      turtleParser :: TurtleParser
+      turtleParser = TurtleParser Nothing Nothing
+  eitherGraph <- liftIO $ RDF.parseURL turtleParser url
+  case eitherGraph of
+    Left err    -> throwError $ RDFParseError err
+    Right graph -> pure graph
+
+parseProfileData
   :: MonadError HTTPClientError m
+  => RDF a
+  -> m ProfileData
+parseProfileData = undefined
+
+getProfileData
+  :: ( MonadError HTTPClientError m
+     , MonadIO m
+     )
   => WebID
   -> m ProfileData
-getProfileData = undefined
+getProfileData webId' =
+  getProfileGraph @RDF.TList  webId' >>= parseProfileData
