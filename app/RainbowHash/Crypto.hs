@@ -50,9 +50,8 @@ validateCert
   -> m ()
 validateCert cert mod' exp' = do
   Crypto.PublicKey {..} <- getPublicKey cert
-  if mod' == public_n && exp' == public_e
-    then pure ()
-    else throwError $ Unauthorized "Certificate did not validate against profile data."
+  unless (mod' == public_n && exp' == public_e) $
+    throwError $ Unauthorized "Certificate did not validate against profile data."
 
 validateUser
   :: ( MonadError CryptoError m
