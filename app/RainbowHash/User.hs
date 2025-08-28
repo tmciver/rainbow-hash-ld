@@ -13,6 +13,6 @@ type WebID = URI
 
 data User = User
   { webId     :: WebID
-  , firstName :: Text
-  , lastName  :: Text
+  , firstName :: Maybe Text
+  , lastName  :: Maybe Text
   }

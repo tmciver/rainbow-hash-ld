@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module RainbowHash.HTTPClient
   ( putFile
@@ -31,6 +32,7 @@ import           Data.RDF                              (ParseFailure, RDF, Rdf,
 import qualified           Data.RDF as RDF
 import qualified Data.Text                             as T
 import qualified Data.Text.Encoding                    as T
+import qualified Data.Text.Read                             as T
 import           Network.HTTP.Client                   (Request,
                                                         RequestBody (RequestBodyBS),
                                                         Response,
@@ -65,6 +67,7 @@ data HTTPClientError
   | ResponseError Status Text
   | RequestError Text
   | RDFParseError ParseFailure
+  | CertificateError Text
   deriving (Show)
 
 putFile
@@ -102,6 +105,7 @@ httpClientErrorToString (HeaderError he) = headerErrorToString he
 httpClientErrorToString (ResponseError status msg) = "HTTP response error. Status code: " <> show status <> ", message: " <> msg
 httpClientErrorToString (RequestError reqText) = "Could not create a HTTP request from \"" <> reqText <> "\""
 httpClientErrorToString (RDFParseError e) = "RDF Parse error: " <> show e
+httpClientErrorToString (CertificateError e) = "Client certificate error: " <> e
 
 checkStatusWithTextMessage
   :: MonadError HTTPClientError m
@@ -217,8 +221,8 @@ postToSPARQL gspUri graph = do
 data ProfileData = ProfileData
   { modulus :: Integer
   , exponent :: Integer
-  , firstName :: Text
-  , lastName :: Text
+  , firstName :: Maybe Text
+  , lastName :: Maybe Text
   }
 
 getProfileGraph
@@ -238,10 +242,82 @@ getProfileGraph webId' = do
     Right graph -> pure graph
 
 parseProfileData
-  :: MonadError HTTPClientError m
+  :: forall m a.
+  ( MonadError HTTPClientError m
+  , Rdf a
+  )
   => RDF a
   -> m ProfileData
-parseProfileData = undefined
+parseProfileData g = do
+  let firstName = queryFirstName g
+      lastName = queryLastName g
+
+  modulus <- queryCertModulus g
+  exponent <- queryCertExponent g
+
+  pure ProfileData {..}
+
+  where queryCertModulus
+          :: ( MonadError HTTPClientError m
+             , Rdf a
+             )
+          => RDF a
+          -> m Integer
+        queryCertModulus g' = do
+          let triples = RDF.query g' Nothing (Just (RDF.UNode "cert:modulus")) Nothing
+          case triples of
+            [] -> throwError $ CertificateError "Could not retrieve certificate modulus from profile data."
+            -- FIXME: return all cert data - not just the first
+            triple:_ -> case triple of
+              -- FIXME: consider all literal nodes, not just the typed version.
+              RDF.Triple _ _ (RDF.LNode (RDF.TypedL modHexStr _)) ->
+                case T.hexadecimal modHexStr of
+                  Left s -> throwError $ CertificateError $ "Could not read certificate modulus from profile data: " <> T.pack s
+                  Right (i, _) -> pure i
+              _ -> throwError $ CertificateError "Could not read certificate modulus from profile data."
+
+        queryCertExponent
+          :: MonadError HTTPClientError m
+          => RDF a
+          -> m Integer
+        queryCertExponent g' = do
+          let triples = RDF.query g' Nothing (Just (RDF.UNode "cert:exponent")) Nothing
+          case triples of
+            [] -> throwError $ CertificateError "Could not retrieve certificate exponent from profile data."
+            -- FIXME: return all cert data - not just the first
+            triple:_ -> case triple of
+              -- FIXME: consider all literal nodes, not just the typed version.
+              RDF.Triple _ _ (RDF.LNode (RDF.PlainL expStr)) ->
+                case readMaybe expStr of
+                  Nothing -> throwError $ CertificateError $ "Could not read certificate exponent from profile data."
+                  Just i -> pure i
+              _ -> throwError $ CertificateError "Could not read certificate modulus from profile data."
+
+        queryFirstName
+          :: RDF a
+          -> Maybe Text
+        queryFirstName g' = do
+          let triples = RDF.query g' Nothing (Just (RDF.UNode "foaf:firstName")) Nothing
+          case triples of
+            [] -> Nothing
+            -- FIXME: look at all triples, not just the first
+            triple:_ -> case triple of
+              -- FIXME: consider all literal nodes, not just the plain version.
+              RDF.Triple _ _ (RDF.LNode (RDF.PlainL firstName)) -> Just firstName
+              _ -> Nothing
+
+        queryLastName
+          :: RDF a
+          -> Maybe Text
+        queryLastName g' = do
+          let triples = RDF.query g' Nothing (Just (RDF.UNode "foaf:familyName")) Nothing
+          case triples of
+            [] -> Nothing
+            -- FIXME: look at all triples, not just the first
+            triple:_ -> case triple of
+              -- FIXME: consider all literal nodes, not just the plain version.
+              RDF.Triple _ _ (RDF.LNode (RDF.PlainL lastName)) -> Just lastName
+              _ -> Nothing
 
 getProfileData
   :: ( MonadError HTTPClientError m
