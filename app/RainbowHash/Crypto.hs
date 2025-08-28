@@ -30,17 +30,22 @@ run = runExceptT . getExceptT
 
 data CryptoError
   = Unauthorized Text
+  | CertificateError Text
   | HTTPError HTTP.HTTPClientError
 
 errorToText :: CryptoError -> Text
 errorToText (Unauthorized t) = "Unauthorized: " <> t
+errorToText (CertificateError t) = "Certificate error: " <> t
 errorToText (HTTPError hce) = HTTP.httpClientErrorToString hce
 
 getPublicKey
   :: MonadError CryptoError m
   => X509.Certificate
   -> m Crypto.PublicKey
-getPublicKey cert = undefined
+getPublicKey cert =
+  case X509.certPubKey cert of
+    X509.PubKeyRSA pubkey -> pure pubkey
+    _ -> throwError $ CertificateError "Non-RSA public key found. Only RSA public supported at this time."
 
 validateCert
   :: MonadError CryptoError m
