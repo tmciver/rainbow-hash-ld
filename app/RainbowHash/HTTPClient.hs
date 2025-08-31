@@ -24,7 +24,7 @@ import           Protolude hiding (exponent)
 
 import           Control.Monad.Catch                   (MonadMask)
 import           Control.Monad.Error                   (mapError)
-import Control.Monad.Logger (MonadLogger, logErrorN)
+import Control.Monad.Logger (MonadLogger, logInfoN, logDebugN, logErrorN)
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Lazy                  as LBS
 import           Data.RDF                              (ParseFailure, RDF, Rdf,
@@ -234,11 +234,13 @@ data ProfileData = ProfileData
 getProfileGraph
   :: ( Rdf a
      , MonadError HTTPClientError m
+     , MonadLogger m
      , MonadIO m
      )
   => WebID
   -> m (RDF a)
 getProfileGraph webId' = do
+  logInfoN $ "Fetching profile document from " <> render webId'
   let url = toS . render $ webId'
       turtleParser :: TurtleParser
       turtleParser = TurtleParser Nothing Nothing
@@ -256,6 +258,7 @@ parseProfileData
   => RDF a
   -> m ProfileData
 parseProfileData g = do
+  logInfoN "Fetching name from user profile document."
   let firstName = queryFirstName g
       lastName = queryLastName g
 
@@ -271,10 +274,15 @@ queryCertData
   => RDF a
   -> m (NonEmpty CertificateData)
 queryCertData g = do
-  let triples = RDF.query g Nothing (Just (RDF.UNode "cert:key")) Nothing
-      certNodes = subject <$> triples
+  logInfoN "Querying certificate data from user profile document."
+  logDebugN $ "Profile graph: " <> T.pack (RDF.showGraph g)
+  let triples = RDF.query g Nothing (Just (RDF.UNode "http://www.w3.org/ns/auth/cert#key")) Nothing
+      certNodes = object <$> triples
       eitherCertData = getCertData g <$> certNodes
       (errs, certData') = partitionEithers eitherCertData
+
+  logDebugN $ "Number of Certificate nodes found: " <> show (length certNodes)
+  logDebugN $ "Certificate nodes found: " <> show certNodes
 
   -- log errors
   forM_ errs logErrorN
@@ -285,6 +293,9 @@ queryCertData g = do
 
 subject :: RDF.Triple -> RDF.Subject
 subject (RDF.Triple s _ _) = s
+
+object :: RDF.Triple -> RDF.Subject
+object (RDF.Triple _ _ o) = o
 
 getCertData
   :: ( MonadError Text m
@@ -303,7 +314,7 @@ getModulus
   -> RDF.Node
   -> m Integer
 getModulus g n = do
-  let modTriples = RDF.query g (Just n) (Just (RDF.UNode "cert:modulus")) Nothing
+  let modTriples = RDF.query g (Just n) (Just (RDF.UNode "http://www.w3.org/ns/auth/cert#modulus")) Nothing
   case modTriples of
     [] -> throwError "Could not retrieve certificate modulus from profile data."
     -- FIXME: consider all literal nodes, not just the typed version.
@@ -321,7 +332,7 @@ getExponent
   -> RDF.Node
   -> m Integer
 getExponent g n = do
-  let expTriples = RDF.query g (Just n) (Just (RDF.UNode "cert:exponent")) Nothing
+  let expTriples = RDF.query g (Just n) (Just (RDF.UNode "http://www.w3.org/ns/auth/cert#exponent")) Nothing
   case expTriples of
     [] -> throwError "Could not retrieve certificate exponent from profile data."
     -- FIXME: consider all literal nodes, not just the typed version.
@@ -330,23 +341,6 @@ getExponent g n = do
         Nothing -> throwError "Could not read certificate exponent from profile data."
         Just i -> pure i
     triples -> throwError $ "Could not read certificate exponent from profile data: " <> show triples
-
--- queryCertExponent
---           :: MonadError HTTPClientError m
---           => RDF a
---           -> m Integer
---         queryCertExponent g' = do
---           let triples = RDF.query g' Nothing (Just (RDF.UNode "cert:exponent")) Nothing
---           case triples of
---             [] -> throwError $ CertificateError "Could not retrieve certificate exponent from profile data."
---             -- FIXME: return all cert data - not just the first
---             triple:_ -> case triple of
---               -- FIXME: consider all literal nodes, not just the typed version.
---               RDF.Triple _ _ (RDF.LNode (RDF.PlainL expStr)) ->
---                 case readMaybe expStr of
---                   Nothing -> throwError $ CertificateError $ "Could not read certificate exponent from profile data."
---                   Just i -> pure i
---               _ -> throwError $ CertificateError "Could not read certificate modulus from profile data."
 
 queryFirstName
   :: Rdf a
@@ -384,4 +378,4 @@ getProfileData
   => WebID
   -> m ProfileData
 getProfileData webId' =
-  getProfileGraph @RDF.TList  webId' >>= parseProfileData
+  getProfileGraph @RDF.TList webId' >>= parseProfileData

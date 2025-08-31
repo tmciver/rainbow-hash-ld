@@ -15,7 +15,7 @@ module RainbowHash.Crypto
 
 import Protolude hiding (exponent)
 
-import Control.Monad.Logger (MonadLogger (..), fromLogStr, toLogStr)
+import Control.Monad.Logger (MonadLogger (..), fromLogStr, toLogStr, logInfoN)
 import qualified Crypto.PubKey.RSA as Crypto
 import qualified Data.X509                             as X509
 
@@ -53,15 +53,21 @@ getPublicKey cert =
     _ -> throwError $ CertificateError "Non-RSA public key found. Only RSA public supported at this time."
 
 validateCert
-  :: MonadError CryptoError m
+  :: ( MonadError CryptoError m
+     , MonadLogger m
+     )
   => X509.Certificate
   -> NonEmpty HTTP.CertificateData
   -> m ()
 validateCert cert certDataList = do
   publicKey <- getPublicKey cert
   let validated = getAny $ foldMap (Any . isValidCert publicKey) certDataList
-  unless validated
-    (throwError $ Unauthorized "Certificate did not validate against profile data.")
+  if validated
+    then logInfoN "Certificate has been validated."
+    else do
+      let msg = "Certificate did not validate against profile data."
+      logInfoN msg
+      throwError $ Unauthorized msg
   where isValidCert :: Crypto.PublicKey -> HTTP.CertificateData -> Bool
         isValidCert Crypto.PublicKey{..} HTTP.CertificateData{..} =
           cdModulus == public_n && cdExponent == public_e
