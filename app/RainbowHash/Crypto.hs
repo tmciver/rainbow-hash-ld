@@ -15,15 +15,20 @@ module RainbowHash.Crypto
 
 import Protolude hiding (exponent)
 
+import Control.Monad.Logger (MonadLogger (..), fromLogStr, toLogStr)
 import qualified Crypto.PubKey.RSA as Crypto
 import qualified Data.X509                             as X509
 
 import           Control.Monad.Error                   (mapError)
 import           RainbowHash.User (WebID, User(..))
 import qualified RainbowHash.HTTPClient as HTTP
+import           RainbowHash.Logger            (writeLog)
 
 newtype CryptoApp a = CryptoApp { getExceptT :: ExceptT CryptoError IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError CryptoError)
+
+instance MonadLogger CryptoApp where
+  monadLoggerLog _ _ logLevel = liftIO . writeLog logLevel . decodeUtf8 . fromLogStr . toLogStr
 
 run :: CryptoApp a -> IO (Either CryptoError a)
 run = runExceptT . getExceptT
@@ -50,16 +55,20 @@ getPublicKey cert =
 validateCert
   :: MonadError CryptoError m
   => X509.Certificate
-  -> Integer
-  -> Integer
+  -> NonEmpty HTTP.CertificateData
   -> m ()
-validateCert cert mod' exp' = do
-  Crypto.PublicKey {..} <- getPublicKey cert
-  unless (mod' == public_n && exp' == public_e) $
-    throwError $ Unauthorized "Certificate did not validate against profile data."
+validateCert cert certDataList = do
+  publicKey <- getPublicKey cert
+  let validated = getAny $ foldMap (Any . isValidCert publicKey) certDataList
+  unless validated
+    (throwError $ Unauthorized "Certificate did not validate against profile data.")
+  where isValidCert :: Crypto.PublicKey -> HTTP.CertificateData -> Bool
+        isValidCert Crypto.PublicKey{..} HTTP.CertificateData{..} =
+          cdModulus == public_n && cdExponent == public_e
 
 validateUser
   :: ( MonadError CryptoError m
+     , MonadLogger m
      , MonadIO m
      )
   => WebID
@@ -70,7 +79,7 @@ validateUser webId' cert = do
   HTTP.ProfileData{..} <- mapError HTTPError (HTTP.getProfileData webId')
 
   -- 2. compare the modulus and exponent to that in the certificate
-  validateCert cert modulus exponent
+  validateCert cert certData
 
   -- 3. if they validate, return user.
   pure $ User webId' firstName lastName
