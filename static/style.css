@@ -1,13 +1,8 @@
 .body-wrapper {
-    width: 80%;
+    width: 50%;
     margin: auto;
 }
 
 .body-wrapper h1 {
     text-align: center;
-}
-
-.body-wrapper form {
-    width: 50%;
-    margin: auto;
 }

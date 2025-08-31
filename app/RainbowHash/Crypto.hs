@@ -88,4 +88,4 @@ validateUser webId' cert = do
   validateCert cert certData
 
   -- 3. if they validate, return user.
-  pure $ User webId' firstName lastName
+  pure $ User webId' name

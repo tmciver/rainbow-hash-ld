@@ -25,6 +25,7 @@ import           Protolude hiding (exponent)
 import           Control.Monad.Catch                   (MonadMask)
 import           Control.Monad.Error                   (mapError)
 import Control.Monad.Logger (MonadLogger, logInfoN, logDebugN, logErrorN)
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Lazy                  as LBS
 import           Data.RDF                              (ParseFailure, RDF, Rdf,
@@ -227,8 +228,7 @@ data CertificateData = CertificateData
 
 data ProfileData = ProfileData
   { certData :: NonEmpty CertificateData
-  , firstName :: Maybe Text
-  , lastName :: Maybe Text
+  , name :: Maybe Text
   }
 
 getProfileGraph
@@ -259,9 +259,8 @@ parseProfileData
   -> m ProfileData
 parseProfileData g = do
   logInfoN "Fetching name from user profile document."
-  let firstName = queryFirstName g
-      lastName = queryLastName g
 
+  name <- queryName g
   certData <- queryCertData g
 
   pure ProfileData {..}
@@ -290,9 +289,6 @@ queryCertData g = do
   case nonEmpty certData' of
     Nothing -> throwError $ CertificateError "Could not read certificate data from profile document."
     Just certData'' -> pure certData''
-
-subject :: RDF.Triple -> RDF.Subject
-subject (RDF.Triple s _ _) = s
 
 object :: RDF.Triple -> RDF.Subject
 object (RDF.Triple _ _ o) = o
@@ -342,33 +338,61 @@ getExponent g n = do
         Just i -> pure i
     triples -> throwError $ "Could not read certificate exponent from profile data: " <> show triples
 
-queryFirstName
-  :: Rdf a
+queryName
+  :: ( MonadLogger m
+     , Rdf a
+     )
   => RDF a
-  -> Maybe Text
-queryFirstName g' = do
-  let triples = RDF.query g' Nothing (Just (RDF.UNode "foaf:firstName")) Nothing
-  case triples of
-    [] -> Nothing
-    -- FIXME: look at all triples, not just the first
-    triple:_ -> case triple of
-      -- FIXME: consider all literal nodes, not just the plain version.
-      RDF.Triple _ _ (RDF.LNode (RDF.PlainL firstName)) -> Just firstName
-      _ -> Nothing
+  -> m (Maybe Text)
+queryName g' = runMaybeT $ queryFirstNameFOAF g' <|> queryFirstNameSchema g' <|> queryNameFOAF g'
 
-queryLastName
-  :: Rdf a
+queryFirstNameFOAF
+  :: ( MonadLogger m
+     , Rdf a
+     )
   => RDF a
-  -> Maybe Text
-queryLastName g' = do
-  let triples = RDF.query g' Nothing (Just (RDF.UNode "foaf:familyName")) Nothing
+  -> MaybeT m Text
+queryFirstNameFOAF g' = do
+  let triples = RDF.query g' Nothing (Just (RDF.UNode "http://xmlns.com/foaf/0.1/firstName")) Nothing
   case triples of
-    [] -> Nothing
+    [] -> empty
     -- FIXME: look at all triples, not just the first
     triple:_ -> case triple of
       -- FIXME: consider all literal nodes, not just the plain version.
-      RDF.Triple _ _ (RDF.LNode (RDF.PlainL lastName)) -> Just lastName
-      _ -> Nothing
+      RDF.Triple _ _ (RDF.LNode (RDF.PlainL firstName)) -> pure firstName
+      _ -> empty
+
+queryFirstNameSchema
+  :: ( MonadLogger m
+     , Rdf a
+     )
+  => RDF a
+  -> MaybeT m Text
+queryFirstNameSchema g' = do
+  let triples = RDF.query g' Nothing (Just (RDF.UNode "https://schema.org/givenName")) Nothing
+  case triples of
+    [] -> empty
+    -- FIXME: look at all triples, not just the first
+    triple:_ -> case triple of
+      -- FIXME: consider all literal nodes, not just the plain version.
+      RDF.Triple _ _ (RDF.LNode (RDF.PlainL firstName)) -> pure firstName
+      _ -> empty
+
+queryNameFOAF
+  :: ( MonadLogger m
+     , Rdf a
+     )
+  => RDF a
+  -> MaybeT m Text
+queryNameFOAF g' = do
+  let triples = RDF.query g' Nothing (Just (RDF.UNode "http://xmlns.com/foaf/0.1/name")) Nothing
+  case triples of
+    [] -> empty
+    -- FIXME: look at all triples, not just the first
+    triple:_ -> case triple of
+      -- FIXME: consider all literal nodes, not just the plain version.
+      RDF.Triple _ _ (RDF.LNode (RDF.PlainL firstName)) -> pure firstName
+      _ -> empty
 
 getProfileData
   :: ( MonadError HTTPClientError m

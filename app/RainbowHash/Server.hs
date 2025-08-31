@@ -39,12 +39,12 @@ api :: Proxy FilesAPI
 api = Proxy
 
 homeHandler :: Config -> User -> Handler Home
-homeHandler config _ = do
+homeHandler config user = do
   -- TODO: getRecentfiles should take the User to determine what files the user can see.
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home (File <$> recentFiles)
+    Right recentFiles -> pure $ Home user (File <$> recentFiles)
 
   where
     errToLBS :: AppError -> LBS.ByteString

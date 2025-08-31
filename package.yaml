@@ -80,6 +80,7 @@ executable:
     - servant-multipart-client
     - servant-server
     - temporary
+    - transformers
     - uuid
     - wai
     - warp
