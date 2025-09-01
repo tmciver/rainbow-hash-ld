@@ -20,8 +20,8 @@ instance ToHtml Home where
     body_ $ do
       div_ [class_ "body-wrapper"] $ do
         h1_ "Caldron"
-        let name = fromMaybe "there" mName
-        p_ (toHtml $ "Hello, " <> name)
+        let name' = fromMaybe "there" mName
+        p_ (toHtml $ "Hello, " <> name' <> "!")
         form_
           [ method_ "POST"
           , action_ "/files"

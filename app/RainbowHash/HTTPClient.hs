@@ -353,7 +353,7 @@ queryFirstNameFOAF
   => RDF a
   -> MaybeT m Text
 queryFirstNameFOAF g' = do
-  let triples = RDF.query g' Nothing (Just (RDF.UNode "http://xmlns.com/foaf/0.1/firstName")) Nothing
+  let triples = RDF.query g' Nothing (Just (RDF.UNode "http://xmlns.com/foaf/0.1/givenName")) Nothing
   case triples of
     [] -> empty
     -- FIXME: look at all triples, not just the first
