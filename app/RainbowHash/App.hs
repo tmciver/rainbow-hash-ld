@@ -16,7 +16,7 @@ import           Protolude
 import           Control.Monad.Catch           (MonadCatch, MonadMask,
                                                 MonadThrow)
 import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
-                                                toLogStr)
+                                                toLogStr, logInfoN)
 import           Data.RDF                      (RDF, TList)
 import qualified Data.Text                     as T
 import qualified Data.Time.Clock               as Time
@@ -58,8 +58,11 @@ instance FilePut AppM FilePath where
 
 instance MetadataPut AppM where
   putFileMetadata blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = do
+    logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
     (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt
+
+    logInfoN "Preparing to POST data to SPARQL endpoint"
 
     -- Post the graph to the SPARQL server via the Graph Store Protocol
     gspUri <- asks sparqlEndpoint
