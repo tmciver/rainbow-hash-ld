@@ -2,10 +2,14 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts  #-}
 
 module RainbowHash.Profile
-  ( getProfileData
-  , RDF4HError(..)
+  ( Profile(..)
+  , getProfile
+  , ProfileError(..)
+  , errorToText
   ) where
 
 import           Protolude
@@ -15,18 +19,31 @@ import           Control.Monad.Logger (MonadLogger, logDebugN, logErrorN,
 import           Data.RDF             (RDF, Rdf, TurtleParser (..))
 import qualified Data.RDF             as RDF
 import qualified Data.Text            as T
+import qualified Data.Text.Read            as T
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Text.URI             (render)
 
-import           RainbowHash.Crypto   (CertificateData (..), ProfileData (..))
-import           RainbowHash.User     (WebID)
+import           RainbowHash.Crypto   (CertificateData (..))
+import           RainbowHash.WebID     (WebID)
 
-data RDF4HError = RDFParseError RDF.ParseFailure
-                | CertificateError Text
-                deriving (Show)
+data Profile = Profile
+  { certData :: NonEmpty CertificateData
+  , name :: Maybe Text
+  }
+
+data ProfileError
+  = RDFParseError RDF.ParseFailure
+  | CertificateError Text
+  deriving (Show)
+
+errorToText :: ProfileError -> Text
+errorToText pe = "Profile error: " <> case pe of
+  (RDFParseError (RDF.ParseFailure s)) -> T.pack s
+  (CertificateError t) -> t
 
 getProfileGraph
   :: ( Rdf a
-     , MonadError RDF4HError m
+     , MonadError ProfileError m
      , MonadLogger m
      , MonadIO m
      )
@@ -42,24 +59,24 @@ getProfileGraph webId' = do
     Left err    -> throwError $ RDFParseError err
     Right graph -> pure graph
 
-parseProfileData
+parseProfile
   :: forall m a.
-  ( MonadError RDF4HError m
+  ( MonadError ProfileError m
   , MonadLogger m
   , Rdf a
   )
   => RDF a
-  -> m ProfileData
-parseProfileData g = do
+  -> m Profile
+parseProfile g = do
   logInfoN "Fetching name from user profile document."
 
   name <- queryName g
   certData <- queryCertData g
 
-  pure ProfileData {..}
+  pure Profile {..}
 
 queryCertData
-  :: ( MonadError RDF4HError m
+  :: ( MonadError ProfileError m
      , MonadLogger m
      , Rdf a
      )
@@ -187,12 +204,12 @@ queryNameFOAF g' = do
       RDF.Triple _ _ (RDF.LNode (RDF.PlainL firstName)) -> pure firstName
       _ -> empty
 
-getProfileData
-  :: ( MonadError RDF4HError m
+getProfile
+  :: ( MonadError ProfileError m
      , MonadLogger m
      , MonadIO m
      )
   => WebID
-  -> m ProfileData
-getProfileData webId' =
-  getProfileGraph @RDF.TList webId' >>= parseProfileData
+  -> m Profile
+getProfile webId' =
+  getProfileGraph @RDF.TList webId' >>= parseProfile

@@ -30,8 +30,9 @@ import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
                                                    mkAuthHandler)
 import           Text.URI                         (mkURI)
 
-import RainbowHash.User (User, WebID)
-import qualified RainbowHash.Crypto as Crypto
+import RainbowHash.User (User)
+import RainbowHash.WebID (WebID)
+import qualified RainbowHash.User as User
 
 type WebIDUserAuth = AuthProtect "webid-auth"
 type instance AuthServerData WebIDUserAuth = User
@@ -72,9 +73,9 @@ validateUser bs = do
       validateWebProfile :: X509.Certificate -> Handler User
       validateWebProfile cert = do
         webId' <- getAltName cert >>= getWebIdFromAltName
-        eitherRes <- liftIO . Crypto.run $ Crypto.validateUser webId' cert
+        eitherRes <- liftIO . User.run $ User.validateUser webId' cert
         case eitherRes of
-          Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . Crypto.errorToText $ e) }
+          Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . User.errorToText $ e) }
           Right user -> pure user
 
 --- | The auth handler wraps a function from Request -> Handler WebID.

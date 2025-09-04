@@ -12,7 +12,6 @@ import qualified Data.Map                 as Map
 import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
                                            RDF, Rdf, lnode, mkRdf, plainL,
                                            triple, typedL, unode)
-import qualified           Data.RDF as RDF
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as TE
 import           Data.Time.Clock          (UTCTime)

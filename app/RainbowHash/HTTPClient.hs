@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 
 module RainbowHash.HTTPClient
   ( putFile
@@ -20,18 +19,13 @@ import           Protolude hiding (exponent)
 
 import           Control.Monad.Catch                   (MonadMask)
 import           Control.Monad.Error                   (mapError)
-import Control.Monad.Logger (MonadLogger, logInfoN, logDebugN, logErrorN)
-import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Lazy                  as LBS
-import           Data.RDF                              (ParseFailure, RDF, Rdf,
+import           Data.RDF                              (RDF, Rdf,
                                                         TurtleSerializer (..),
-                                                        TurtleParser(..),
                                                         hWriteRdf)
-import qualified           Data.RDF as RDF
 import qualified Data.Text                             as T
 import qualified Data.Text.Encoding                    as T
-import qualified Data.Text.Read                             as T
 import           Network.HTTP.Client                   (Request,
                                                         RequestBody (RequestBodyBS),
                                                         Response,
@@ -52,8 +46,6 @@ import           Network.HTTP.Types                    (Header, Status,
 import           System.IO                             (hClose)
 import           System.IO.Temp                        (withSystemTempFile)
 import           Text.URI                              (URI, mkURI, render)
-
-import           RainbowHash.User (WebID)
 
 newtype HTTPApp a = HTTPApp { getExceptT :: ExceptT HTTPClientError IO a }
   deriving (Functor, Applicative, Monad, MonadError HTTPClientError)

@@ -18,7 +18,7 @@ import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..),
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
-import           RainbowHash.User (User(..))
+import           RainbowHash.User (User, userWebId)
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
@@ -74,7 +74,7 @@ filesHandler config user multipartData = do
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
 
-          either' <- liftIO $ runApp (putFile filePath (webId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent

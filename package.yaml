@@ -44,6 +44,8 @@ executable:
     - RainbowHash.HTTPClient
     - RainbowHash.MediaTypeDiscover
     - RainbowHash.Options
+    - RainbowHash.Profile
+    - RainbowHash.WebID
     - RainbowHash.RDF4H
     - RainbowHash.Servant
     - RainbowHash.Server

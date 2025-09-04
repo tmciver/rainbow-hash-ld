@@ -8,19 +8,19 @@ import           Protolude             hiding (for_)
 import           Lucid
 
 import           RainbowHash.View.File (File (..))
-import RainbowHash.User (User(..))
+import RainbowHash.User (User, userName)
 
 data Home = Home User [File]
 
 instance ToHtml Home where
-  toHtml (Home (User _ mName)files) = html_ $ do
+  toHtml (Home user files) = html_ $ do
     head_ $ do
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "static/style.css"]
     body_ $ do
       div_ [class_ "body-wrapper"] $ do
         h1_ "Caldron"
-        let name' = fromMaybe "there" mName
+        let name' = fromMaybe "there" (userName user)
         p_ (toHtml $ "Hello, " <> name' <> "!")
         form_
           [ method_ "POST"
