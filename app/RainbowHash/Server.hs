@@ -90,9 +90,14 @@ filesHandler config user multipartData = do
                 isDescription = (== "description") . iName
 
         getFileNodeCreationOption :: [Input] -> FileNodeCreateOption
-        getFileNodeCreationOption = boolToFNCO . maybe False ((== "1") . iValue) . find isFileNodeCreationOption
+        getFileNodeCreationOption = boolToFNCO . maybe False (isEnabled . iValue) . find isFileNodeCreationOption
           where isFileNodeCreationOption :: Input -> Bool
                 isFileNodeCreationOption = (== "create-new-node") . iName
+
+                isEnabled :: Text -> Bool
+                isEnabled "1" = True
+                isEnabled "on" = True
+                isEnabled _ = False
 
                 boolToFNCO :: Bool -> FileNodeCreateOption
                 boolToFNCO True  = AlwaysCreate

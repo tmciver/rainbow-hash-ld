@@ -99,17 +99,19 @@ putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreate
 
   -- What is done next depends on the value of fileNodeCreateOption
   case fileNodeCreateOption of
-    AlwaysCreate ->
+    AlwaysCreate -> do
+      logInfoN "User requested creation of a new file node (even if one already exists)."
       putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
       >>= logPutFile blobUrl t mt
     CreateIfNotExists -> do
       maybeFileUrl <- getFileForContent blobUrl
       case maybeFileUrl of
         Just fileUrl' -> do
-          logInfoN "FileDataObject already exists for this content; returning existing URL."
+          logInfoN "File object already exists for this content; returning existing URL."
           -- TODO: should the title and description be updated to what's given in this request?
           pure fileUrl'
-        Nothing ->
+        Nothing -> do
+          logInfoN "No file object exists for this content; creating a new file object."
           putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
           >>= logPutFile blobUrl t mt
 
