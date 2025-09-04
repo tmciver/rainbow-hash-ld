@@ -7,7 +7,7 @@
 
 module RainbowHash.Servant
   ( WebID
-  , WebIDAuth
+  , WebIDUserAuth
   , genAuthServerContext
   ) where
 
@@ -18,7 +18,7 @@ import qualified Data.ByteString.Lazy.Char8       as Char8
 import qualified Data.Map                         as Map
 import           Data.PEM                         (PEM, pemContent, pemParseLBS)
 import qualified Data.Text                        as T
---import qualified Data.Text.Encoding               as T
+import qualified Data.Text.Encoding                    as T
 import qualified Data.X509                        as X509
 import           Network.HTTP.Types               (urlDecode)
 import           Network.Wai                      (Request, requestHeaders)
@@ -28,17 +28,19 @@ import           Servant.Server                   (Context (EmptyContext, (:.)),
                                                    err400, err401, errBody)
 import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
                                                    mkAuthHandler)
-import           Text.URI                         (URI, mkURI)
+import           Text.URI                         (mkURI)
 
-type WebID = URI
-type WebIDAuth = AuthProtect "webid-auth"
+import RainbowHash.User (User)
+import RainbowHash.WebID (WebID)
+import qualified RainbowHash.User as User
 
-type instance AuthServerData WebIDAuth = WebID
+type WebIDUserAuth = AuthProtect "webid-auth"
+type instance AuthServerData WebIDUserAuth = User
 
-getWebID :: ByteString -> Handler WebID
-getWebID bs = do
+validateUser :: ByteString -> Handler User
+validateUser bs = do
   let decodedBS = urlDecode True bs
-  parsePEM decodedBS >>= getCertificate >>= getAltName >>= getWebIdFromAltName
+  parsePEM decodedBS >>= getCertificate >>= validateWebProfile
 
     where
       parsePEM :: ByteString -> Handler PEM
@@ -68,23 +70,31 @@ getWebID bs = do
           Nothing -> throwError $ err400 { errBody = "Could not parse a URI from the given text: " <>  Char8.pack uriText }
       getWebIdFromAltName san = throwError $ err400 { errBody = "Could not read a WebID from the given subject alternative name: " <> show san }
 
+      validateWebProfile :: X509.Certificate -> Handler User
+      validateWebProfile cert = do
+        webId' <- getAltName cert >>= getWebIdFromAltName
+        eitherRes <- liftIO . User.run $ User.validateUser webId' cert
+        case eitherRes of
+          Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . User.errorToText $ e) }
+          Right user -> pure user
+
 --- | The auth handler wraps a function from Request -> Handler WebID.
 --- We look for the client certificate in the X-SSL-CERT request header.
 --- The client certificate text is then passed to our `getWebid` function.
-authHandler :: AuthHandler Request WebID
+authHandler :: AuthHandler Request User
 authHandler = mkAuthHandler handler
   where
     throw401 msg = throwError $ err401 { errBody = msg }
-    handler :: Request -> Handler WebID
+    handler :: Request -> Handler User
     handler req =
       req & requestHeaders
           & Map.fromList
           & Map.lookup "X-SSL-CERT"
           & maybeToEither "Missing X-SSL-CERT header"
-          & either throw401 getWebID
+          & either throw401 validateUser
 
 -- | The context that will be made available to request handlers. We supply the
 -- "cookie-auth"-tagged request handler defined above, so that the 'HasServer' instance
 -- of 'AuthProtect' can extract the handler and run it on the request.
-genAuthServerContext :: Context (AuthHandler Request WebID ': '[])
+genAuthServerContext :: Context (AuthHandler Request User ': '[])
 genAuthServerContext = authHandler :. EmptyContext

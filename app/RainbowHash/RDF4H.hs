@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module RainbowHash.RDF4H
   ( fileDataToRDF
@@ -12,7 +13,7 @@ import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
                                            RDF, Rdf, lnode, mkRdf, plainL,
                                            triple, typedL, unode)
 import qualified Data.Text                as T
-import qualified Data.Text.Encoding       as T
+import qualified Data.Text.Encoding       as TE
 import           Data.Time.Clock          (UTCTime)
 import           Data.Time.Format.ISO8601 (iso8601Show)
 import           Data.UUID                (toText)
@@ -20,6 +21,7 @@ import           Data.UUID.V4             (nextRandom)
 import           Network.HTTP.Media       (MediaType, renderHeader)
 import           Text.URI                 (URI, mkURI, render)
 
+-- TODO: Make this generic. It doesn't appear to need IO.
 fileDataToRDF
   :: (Rdf a)
   => URI -- ^URI to the bytes of the file content.
@@ -31,6 +33,7 @@ fileDataToRDF
   -> MediaType
   -> IO (URI, RDF a)
 fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = do
+  -- FIXME: Replace example.com
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
 
@@ -80,7 +83,7 @@ fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = 
         , triple (unode fileDataUriText) (unode "fo:fileContent") (unode $ render blobUrl)
         , triple (unode fileDataUriText) (unode "fo:fileCreated") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple (unode fileDataUriText) (unode "fo:fileCreatedBy") (unode $ render createdByUri)
-        , triple (unode fileDataUriText) (unode "fo:mediaType") (lnode (plainL . T.decodeUtf8 . renderHeader $ mt))
+        , triple (unode fileDataUriText) (unode "fo:mediaType") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))
         ]
         <>
 
@@ -110,7 +113,7 @@ fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = 
         <>
 
         -- Schema.org stuff
-        [triple (unode fileUriText) (unode "schema:encodingFormat") (lnode (plainL . T.decodeUtf8 . renderHeader $ mt))]
+        [triple (unode fileUriText) (unode "schema:encodingFormat") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))]
         <>
         case maybeTitle of
           Just title -> [triple (unode fileUriText) (unode "schema:title") (lnode $ plainL title)]
@@ -119,3 +122,4 @@ fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = 
       rdf = mkRdf triples (Just $ BaseUrl baseUrlText) prefixes
 
   pure (fileUri, rdf)
+

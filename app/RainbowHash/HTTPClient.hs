@@ -2,16 +2,20 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module RainbowHash.HTTPClient
   ( putFile
+  , HTTPApp
+  , run
   , HTTPClientError(..)
   , mapError
   , httpClientErrorToString
   , postToSPARQL
   ) where
 
-import           Protolude
+import           Protolude hiding (exponent)
 
 import           Control.Monad.Catch                   (MonadMask)
 import           Control.Monad.Error                   (mapError)
@@ -42,6 +46,12 @@ import           Network.HTTP.Types                    (Header, Status,
 import           System.IO                             (hClose)
 import           System.IO.Temp                        (withSystemTempFile)
 import           Text.URI                              (URI, mkURI, render)
+
+newtype HTTPApp a = HTTPApp { getExceptT :: ExceptT HTTPClientError IO a }
+  deriving (Functor, Applicative, Monad, MonadError HTTPClientError)
+
+run :: HTTPApp a -> IO (Either HTTPClientError a)
+run = runExceptT . getExceptT
 
 data HTTPClientError
   = HeaderError HeaderError

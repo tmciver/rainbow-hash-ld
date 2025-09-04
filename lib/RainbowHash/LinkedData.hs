@@ -77,11 +77,15 @@ putFile
   -> m URI
 putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
 
+  logInfoN $ "Adding file " <> fromMaybe "<unnamed>" maybeFileName <> " with title " <> fromMaybe "<notitle>" maybeTitle
+
   -- Get the current time
   t <- getCurrentTime
 
   -- Use given media type or discover what it is.
   mt <- maybe (getMediaType v) pure maybeMT
+
+  logInfoN $ "Media type: " <> show mt
 
   -- Use the given filename or get it from v
   maybeFileName' <- case maybeFileName of
@@ -90,6 +94,8 @@ putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreate
 
   -- Add file to blob store.
   blobUrl <- putFileInStore v
+
+  logInfoN $ "Added file to store at URL " <> render blobUrl
 
   -- What is done next depends on the value of fileNodeCreateOption
   case fileNodeCreateOption of

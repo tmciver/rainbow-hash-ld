@@ -17,7 +17,8 @@ import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..),
                                          getRecentFiles, putFile)
-import           RainbowHash.Servant    (WebID, WebIDAuth, genAuthServerContext)
+import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
+import           RainbowHash.User (User, userWebId)
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
@@ -28,7 +29,7 @@ instance ToHttpApiData ServantURI where
   toUrlPiece = render . toURI
 
 type FilesAPI =
-  WebIDAuth :>
+  WebIDUserAuth :>
   (Get '[HTML] Home
     :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
                  :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent))
@@ -37,13 +38,13 @@ type FilesAPI =
 api :: Proxy FilesAPI
 api = Proxy
 
-homeHandler :: Config -> WebID -> Handler Home
-homeHandler config _ = do
-  -- TODO: getRecentfiles should take the WebID to determine what files the user can see.
+homeHandler :: Config -> User -> Handler Home
+homeHandler config user = do
+  -- TODO: getRecentfiles should take the User to determine what files the user can see.
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home (File <$> recentFiles)
+    Right recentFiles -> pure $ Home user (File <$> recentFiles)
 
   where
     errToLBS :: AppError -> LBS.ByteString
@@ -51,20 +52,19 @@ homeHandler config _ = do
 
 filesHandler
   :: Config
-  -> WebID
+  -> User
   -> MultipartData Tmp
   -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-filesHandler config webId multipartData = do
+filesHandler config user multipartData = do
   case files multipartData of
-    [fileData] -> uploadFile webId fileData (inputs multipartData)
+    [fileData] -> uploadFile fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
-          :: WebID
-          -> FileData Tmp
+          :: FileData Tmp
           -> [Input]
           -> Handler (Headers '[Header "Location" ServantURI] NoContent)
-        uploadFile webId' fileData fields = do
+        uploadFile fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -74,7 +74,7 @@ filesHandler config webId multipartData = do
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
 
-          either' <- liftIO $ runApp (putFile filePath webId' maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right uri -> pure $ addHeader (ServantURI uri) NoContent
@@ -105,7 +105,7 @@ staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
 server :: Config -> Server FilesAPI
-server config = (\webId -> homeHandler config webId :<|> filesHandler config webId) :<|> staticHandler
+server config = (\authedUser -> homeHandler config authedUser :<|> filesHandler config authedUser) :<|> staticHandler
 
 app :: Config -> Application
 app config = serveWithContext api genAuthServerContext (server config)
