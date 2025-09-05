@@ -32,7 +32,7 @@ type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
     :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
-                 :> PostCreated '[JSON] (Headers '[Header "Location" ServantURI] NoContent))
+                 :> Post '[JSON] NoContent)
   :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
@@ -54,7 +54,7 @@ filesHandler
   :: Config
   -> User
   -> MultipartData Tmp
-  -> Handler (Headers '[Header "Location" ServantURI] NoContent)
+  -> Handler NoContent
 filesHandler config user multipartData = do
   case files multipartData of
     [fileData] -> uploadFile fileData (inputs multipartData)
@@ -63,7 +63,7 @@ filesHandler config user multipartData = do
   where uploadFile
           :: FileData Tmp
           -> [Input]
-          -> Handler (Headers '[Header "Location" ServantURI] NoContent)
+          -> Handler NoContent
         uploadFile fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
@@ -77,7 +77,7 @@ filesHandler config user multipartData = do
           either' <- liftIO $ runApp (putFile filePath (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
-            Right uri -> pure $ addHeader (ServantURI uri) NoContent
+            Right _ -> throwError err303 { errHeaders = [("Location", "/")] }
 
         getTitle :: [Input] -> Maybe Text
         getTitle = (<&> iValue) . find isTitle
