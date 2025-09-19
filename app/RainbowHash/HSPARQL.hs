@@ -186,7 +186,6 @@ getRecentFiles sparqlEndpoint = do
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
   -- prefixes
-  rdfs <- prefix "rdfs" (iriRef "http://www.w3.org/2000/01/rdf-schema#")
   fo <- prefix "fo" (iriRef "http://timmciver.com/file-ontology#")
   dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
 
@@ -194,7 +193,7 @@ recentFilesQuery = do
   fileIri <- var
   fileDataIri <- var
   name <- var
-  label <- var
+  title <- var
   desc <- var
   mediaType <- var
   created <- var
@@ -205,7 +204,7 @@ recentFilesQuery = do
   triple_ fileIri (fo .:. "fileData") fileDataIri
   triple_ fileDataIri (fo .:. "contentUrl") contentUrl
   optional_ (triple_ fileIri (fo .:. "fileName") name)
-  optional_ (triple_ fileIri (rdfs .:. "label") label)
+  optional_ (triple_ fileIri (dct .:. "title") title)
   optional_ (triple_ fileIri (dct .:. "description") desc)
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
@@ -215,7 +214,7 @@ recentFilesQuery = do
 
   limit_ 10
 
-  selectVars [fileIri, name, label, desc, mediaType, created, updated, contentUrl]
+  selectVars [fileIri, name, title, desc, mediaType, created, updated, contentUrl]
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do
