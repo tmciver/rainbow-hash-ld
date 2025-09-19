@@ -224,23 +224,24 @@ getFileForContent contentUrl sparqlEndpoint = do
   maybeBvss <- selectQuery (unpack $ render sparqlEndpoint) (fileForContentQuery contentUrl)
   pure $ maybeBvss >>= toUri
   where toUri :: [[BindingValue]] -> Maybe URI
-        toUri [[Bound (UNode uriText)]] = mkURI uriText
+        toUri ([Bound (UNode uriText)]:_) = mkURI uriText
         toUri _                         = Nothing
 
 fileForContentQuery :: URI -> Query SelectQuery
 fileForContentQuery contentUrl = do
-  rdf <- prefix "rdf" (iriRef "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
-  nfo <- prefix "nfo" (iriRef "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#")
+  fo <- prefix "fo" (iriRef "http://timmciver.com/file-ontology#")
+  dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
 
   fileIri <- var
+  fileDataIri <- var
   created <- var
 
   let contentNode :: Node
       contentNode = UNode $ render contentUrl
 
-  triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
-  triple_ fileIri (nfo .:. "fileUri") contentNode
-  triple_ fileIri (nfo .:. "fileCreated") created
+  triple_ fileIri (fo .:. "fileData") fileDataIri
+  triple_ fileDataIri (fo .:. "contentUrl") contentNode
+  triple_ fileIri (dct .:. "created") created
 
   orderNextDesc created
 
