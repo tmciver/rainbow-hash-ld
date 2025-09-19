@@ -95,9 +95,11 @@ fileDataToRDF blobUrl agentUri maybeFileName maybeTitle maybeDesc time mt = do
         <>
 
         -- Point this file at the above FileData object.
-        [ triple fileUriNode (unode "fo:fileData") fileDataUriNode
+        [ triple fileUriNode (unode "rdf:type") (unode "fo:File")
+        , triple fileUriNode (unode "fo:fileData") fileDataUriNode
         , triple fileUriNode (unode "dct:created") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple fileUriNode (unode "dct:modified") (lnode (typedL timeISO8601 "xsd:dateTime"))
+        , triple fileUriNode (unode "dct:format") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))
         ]
         <>
 
@@ -113,6 +115,7 @@ fileDataToRDF blobUrl agentUri maybeFileName maybeTitle maybeDesc time mt = do
         -- Add some filename triples, if we have it.
         case maybeFileName of
           Just fileName -> [ triple fileUriNode (unode "nfo:fileName") (lnode $ plainL fileName)
+                           , triple fileUriNode (unode "fo:fileName") (lnode $ plainL fileName)
                            , triple fileDataUriNode (unode "fo:fileName") (lnode $ plainL fileName)
                            ]
           Nothing -> []
