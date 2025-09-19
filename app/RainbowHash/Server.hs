@@ -11,7 +11,6 @@ import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
-import           Text.URI               (URI, render)
 
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (Config (..))
@@ -22,11 +21,6 @@ import           RainbowHash.User (User, userWebId)
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
-
-newtype ServantURI = ServantURI { toURI :: URI }
-
-instance ToHttpApiData ServantURI where
-  toUrlPiece = render . toURI
 
 type FilesAPI =
   WebIDUserAuth :>

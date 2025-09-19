@@ -185,12 +185,14 @@ getRecentFiles sparqlEndpoint = do
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
-  rdf <- prefix "rdf" (iriRef "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+  -- prefixes
   rdfs <- prefix "rdfs" (iriRef "http://www.w3.org/2000/01/rdf-schema#")
-  nfo <- prefix "nfo" (iriRef "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#")
-  schema <- prefix "schema" (iriRef "https://schema.org/")
+  fo <- prefix "fo" (iriRef "http://timmciver.com/file-ontology#")
+  dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
 
+  -- variables
   fileIri <- var
+  fileDataIri <- var
   name <- var
   label <- var
   desc <- var
@@ -199,14 +201,15 @@ recentFilesQuery = do
   updated <- var
   contentUrl <- var
 
-  triple_ fileIri (rdf .:. "type") (nfo .:. "FileDataObject")
-  optional_ (triple_ fileIri (nfo .:. "fileName") name)
+  -- where clause
+  triple_ fileIri (fo .:. "fileData") fileDataIri
+  triple_ fileDataIri (fo .:. "contentUrl") contentUrl
+  optional_ (triple_ fileIri (fo .:. "fileName") name)
   optional_ (triple_ fileIri (rdfs .:. "label") label)
-  optional_ (triple_ fileIri (rdfs .:. "comment") desc)
-  triple_ fileIri (schema .:. "encodingFormat") mediaType
-  triple_ fileIri (nfo .:. "fileCreated") created
-  triple_ fileIri (nfo .:. "fileLastModified") updated
-  triple_ fileIri (nfo .:. "fileUri") contentUrl
+  optional_ (triple_ fileIri (dct .:. "description") desc)
+  triple_ fileIri (dct .:. "format") mediaType
+  triple_ fileIri (dct .:. "created") created
+  triple_ fileIri (dct .:. "modified") updated
 
   orderNextDesc created
 
