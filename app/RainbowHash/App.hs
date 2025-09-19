@@ -21,6 +21,7 @@ import           Data.RDF                      (RDF, TList)
 import qualified Data.Text                     as T
 import qualified Data.Time.Clock               as Time
 import           System.FilePath               (takeFileName)
+import System.IO (hFileSize)
 
 import           RainbowHash.Config            (Config (..))
 import qualified RainbowHash.HSPARQL           as HSPARQL
@@ -57,10 +58,10 @@ instance FilePut AppM FilePath where
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
-  putFileMetadata blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt = do
+  putFileMetadata blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt = do
     logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF blobUrl createdByUri maybeFileName maybeTitle maybeDesc time mt
+    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt
 
     logInfoN "Preparing to POST data to SPARQL endpoint"
 
@@ -75,6 +76,9 @@ instance MediaTypeDiscover AppM FilePath where
 
 instance FileNameGet AppM FilePath where
   getFileName = pure . Just . T.pack . takeFileName
+
+instance FileSizeGet AppM FilePath where
+  getFileSize fp = liftIO $ withFile fp ReadMode hFileSize
 
 instance Time AppM where
   getCurrentTime = liftIO Time.getCurrentTime

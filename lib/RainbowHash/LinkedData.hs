@@ -7,6 +7,7 @@ module RainbowHash.LinkedData
   , MetadataPut(..)
   , MediaTypeDiscover(..)
   , FileNameGet(..)
+  , FileSizeGet(..)
   , Time(..)
   , FileNodeCreateOption(..)
   ) where
@@ -43,6 +44,7 @@ class Monad m => MetadataPut m where
     :: URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
     -> Maybe Text -- ^file name. May be unavailable if client calls putFile on ByteString.
+    -> Integer    -- ^file size
     -> Maybe Text -- ^title
     -> Maybe Text -- ^description
     -> UTCTime -- ^file creation time
@@ -55,6 +57,9 @@ class Monad m => MediaTypeDiscover m v where
 class Monad m => FileNameGet m v where
   getFileName :: v -> m (Maybe Text)
 
+class Monad m => FileSizeGet m v where
+  getFileSize :: v -> m Integer
+
 class Monad m => Time m where
   getCurrentTime :: m UTCTime
 
@@ -64,6 +69,7 @@ putFile
      , MetadataPut m
      , MediaTypeDiscover m v
      , FileNameGet m v
+     , FileSizeGet m v
      , Time m
      , MonadLogger m
      )
@@ -92,6 +98,9 @@ putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreate
     Just fn -> pure $ Just fn
     Nothing -> getFileName v
 
+  -- Get the file's size
+  size <- getFileSize v
+
   -- Add file to blob store.
   blobUrl <- putFileInStore v
 
@@ -101,7 +110,7 @@ putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreate
   case fileNodeCreateOption of
     AlwaysCreate -> do
       logInfoN "User requested creation of a new file node (even if one already exists)."
-      putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
+      putFileMetadata blobUrl createdByUri maybeFileName' size maybeTitle maybeDesc t mt
       >>= logPutFile blobUrl t mt
     CreateIfNotExists -> do
       maybeFileUrl <- getFileForContent blobUrl
@@ -112,7 +121,7 @@ putFile v createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreate
           pure fileUrl'
         Nothing -> do
           logInfoN "No file object exists for this content; creating a new file object."
-          putFileMetadata blobUrl createdByUri maybeFileName' maybeTitle maybeDesc t mt
+          putFileMetadata blobUrl createdByUri maybeFileName' size maybeTitle maybeDesc t mt
           >>= logPutFile blobUrl t mt
 
 -- Logs the data used to create a file object.

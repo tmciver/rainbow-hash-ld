@@ -9,7 +9,7 @@ module RainbowHash.RDF4H
 import           Protolude
 
 import qualified Data.Map                 as Map
-import           Data.RDF                 (Triple, Node, BaseUrl (..), PrefixMappings (..),
+import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
                                            RDF, Rdf, lnode, mkRdf, plainL,
                                            triple, typedL, unode)
 import qualified Data.Text                as T
@@ -27,12 +27,13 @@ fileDataToRDF
   => URI -- ^URI to the bytes of the file content.
   -> URI -- ^URI of the agent that created the file.
   -> Maybe Text -- ^filename
+  -> Integer    -- ^file size
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF blobUrl agentUri maybeFileName maybeTitle maybeDesc time mt = do
+fileDataToRDF blobUrl agentUri maybeFileName size maybeTitle maybeDesc time mt = do
   -- FIXME: Replace example.com
   let baseUrlText :: Text
       baseUrlText = "http://example.com/data/"
@@ -81,6 +82,7 @@ fileDataToRDF blobUrl agentUri maybeFileName maybeTitle maybeDesc time mt = do
         -- Create a FileData object.
         [ triple fileDataUriNode (unode "rdf:type") (unode "fo:FileData")
         , triple fileDataUriNode (unode "fo:contentUrl") (unode $ render blobUrl)
+        , triple fileDataUriNode (unode "fo:size") (lnode (typedL (show size) "xsd:integer"))
         , triple fileDataUriNode (unode "dct:format") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))
         , triple fileDataUriNode (unode "dct:created") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple fileDataUriNode (unode "dct:creator") (unode $ render agentUri)
@@ -90,6 +92,7 @@ fileDataToRDF blobUrl agentUri maybeFileName maybeTitle maybeDesc time mt = do
         -- Point this file at the above FileData object.
         [ triple fileUriNode (unode "rdf:type") (unode "fo:File")
         , triple fileUriNode (unode "fo:fileData") fileDataUriNode
+        , triple fileUriNode (unode "fo:size") (lnode (typedL (show size) "xsd:integer"))
         , triple fileUriNode (unode "dct:created") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple fileUriNode (unode "dct:modified") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple fileUriNode (unode "dct:format") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))

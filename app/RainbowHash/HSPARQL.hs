@@ -84,9 +84,10 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           fileUri' <- getUri fileUriBV
           maybeFileName <- getPlainLiteralMaybe fileNameBV
+          fileSize' <- getFileSize fileSizeBV
           maybeTitle <- getPlainLiteralMaybe titleBV
           maybeDesc <- getPlainLiteralMaybe descBV
           mediaType <- getMediaType mediaTypeBV
@@ -94,7 +95,7 @@ getRecentFiles sparqlEndpoint = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri' maybeFileName maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
 
         getUri
@@ -166,6 +167,22 @@ getRecentFiles sparqlEndpoint = do
             Just t  -> pure t
         parseDateTimeNode node = throwError $ BindingValueError $ NonLiteralNode node
 
+        getFileSize
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m Integer
+        getFileSize = parseUnboundAsError parseFileSizeNode
+
+        parseFileSizeNode
+          :: MonadError HsparqlError m
+          => Node
+          -> m Integer
+        parseFileSizeNode node@(LNode (TypedL sizeText _)) =
+          case readMaybe sizeText of
+            Nothing -> throwError $ BindingValueError $ LiteralParseError node
+            Just s  -> pure s
+        parseFileSizeNode node = throwError $ BindingValueError $ NonLiteralNode node
+
         parseBoundNode
           :: MonadError HsparqlError m
           => (Node -> m a)
@@ -193,6 +210,7 @@ recentFilesQuery = do
   fileIri <- var
   fileDataIri <- var
   name <- var
+  size <- var
   title <- var
   desc <- var
   mediaType <- var
@@ -206,6 +224,7 @@ recentFilesQuery = do
   optional_ (triple_ fileIri (fo .:. "fileName") name)
   optional_ (triple_ fileIri (dct .:. "title") title)
   optional_ (triple_ fileIri (dct .:. "description") desc)
+  triple_ fileIri (fo .:. "size") size
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
@@ -214,7 +233,7 @@ recentFilesQuery = do
 
   limit_ 10
 
-  selectVars [fileIri, name, title, desc, mediaType, created, updated, contentUrl]
+  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do

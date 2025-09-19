@@ -9,6 +9,7 @@ import           Text.URI           (URI)
 data File = File
   { fileUri         :: URI
   , fileName        :: Maybe Text
+  , fileSize        :: Integer
   , fileTitle       :: Maybe Text
   , fileDescription :: Maybe Text
   , fileMediaType   :: MediaType

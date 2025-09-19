@@ -28,6 +28,7 @@ instance ToHtml [File] where
       thead_ [class_ "thead-dark"] $ do
         tr_ $ do
           th_ "File name"
+          th_ "Size (bytes)"
           th_ "Title"
           th_ "Description"
           th_ "Media Type"
@@ -42,6 +43,7 @@ instance ToHtml File where
   toHtml (File f) = do
     tr_ $ do
       td_ (toHtml . fromMaybe "" . RH.fileName $ f)
+      td_ (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
       td_ (toHtml . fromMaybe "" . RH.fileTitle $ f)
       td_ (toHtml . fromMaybe "" . RH.fileDescription $ f)
       td_ (toHtml . showMediaType . RH.fileMediaType $ f)
