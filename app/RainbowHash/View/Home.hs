@@ -7,10 +7,10 @@ import           Protolude             hiding (for_)
 
 import           Lucid
 
-import           RainbowHash.View.File (FileRow (..))
+import           RainbowHash.View.File (File (..))
 import RainbowHash.User (User, userName)
 
-data Home = Home User [FileRow]
+data Home = Home User [File]
 
 instance ToHtml Home where
   toHtml (Home user files) = html_ $ do

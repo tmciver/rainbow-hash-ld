@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module RainbowHash.View.File (File(..), FileRow(..)) where
+module RainbowHash.View.File (File(..)) where
 
 import           Protolude
 
@@ -20,9 +20,11 @@ newtype File = File RH.File
 
 newtype FileRow = FileRow RH.File
 
-instance ToHtml [FileRow] where
+instance ToHtml [File] where
   toHtml [] = pure ()
-  toHtml files = do
+  toHtml files =
+    let fileRows = (\(File f) -> FileRow f) <$> files
+    in do
     h2_ "Recent Files"
     table_ [ makeAttribute "border" "1"
            , classes_ ["table", "table-bordered", "table-hover"]
@@ -37,7 +39,7 @@ instance ToHtml [FileRow] where
           th_ "Created"
           th_ "Last Modified"
           th_ "Content"
-      tbody_ (foldMap toHtml files)
+      tbody_ (foldMap toHtml fileRows)
 
   toHtmlRaw = toHtml
 
