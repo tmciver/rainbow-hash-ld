@@ -11,10 +11,11 @@ import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
+import           Text.URI               (mkURI)
 
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (Config (..))
-import           RainbowHash.LinkedData (FileNodeCreateOption (..),
+import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
 import           RainbowHash.User (User, userWebId)
@@ -27,11 +28,15 @@ type FilesAPI =
   (Get '[HTML] Home
     :<|> "files" :> Header "Host" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
-                 :> Post '[JSON] NoContent)
+                 :> Post '[JSON] NoContent
+    :<|> "file" :> Capture "fileId" Text :> Get '[HTML] File)
   :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
 api = Proxy
+
+errToLBS :: AppError -> LBS.ByteString
+errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
 homeHandler :: Config -> User -> Handler Home
 homeHandler config user = do
@@ -41,9 +46,16 @@ homeHandler config user = do
     Left err          -> throwError $ err500 { errBody = errToLBS err }
     Right recentFiles -> pure $ Home user (File <$> recentFiles)
 
-  where
-    errToLBS :: AppError -> LBS.ByteString
-    errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
+fileHandler :: Config -> User -> Text -> Handler File
+fileHandler config _ fileId =
+  case mkURI fileId of
+    Nothing -> throwError $ err400 { errBody = "Invalid file identifier." }
+    Just fileUri -> do
+      either' <- liftIO $ runApp (getFile fileUri) config
+      case either' of
+        Left err          -> throwError $ err500 { errBody = errToLBS err }
+        Right Nothing     -> throwError err404
+        Right (Just file) -> pure $ File file
 
 filesHandler
   :: Config
@@ -106,14 +118,11 @@ filesHandler config user mHost multipartData = do
                 boolToFNCO True  = AlwaysCreate
                 boolToFNCO False = CreateIfNotExists
 
-        errToLBS :: AppError -> LBS.ByteString
-        errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
-
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
 server :: Config -> Server FilesAPI
-server config = (\authedUser -> homeHandler config authedUser :<|> filesHandler config authedUser) :<|> staticHandler
+server config = (\authedUser -> homeHandler config authedUser :<|> filesHandler config authedUser :<|> fileHandler config authedUser) :<|> staticHandler
 
 app :: Config -> Application
 app config = serveWithContext api genAuthServerContext (server config)
