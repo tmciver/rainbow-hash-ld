@@ -7,12 +7,14 @@ module RainbowHash.Server (app) where
 
 import           Protolude              hiding (Handler)
 
+import           Control.Monad.Logger          (LogLevel(LevelInfo))
 import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
 import           Text.URI               (mkURI)
 
+import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
@@ -54,6 +56,7 @@ fileHandler config _ mHost fileId =
   in case mkURI uriText of
     Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
     Just fileUri -> do
+      liftIO $ writeLog LevelInfo $ "Getting file: " <> uriText
       either' <- liftIO $ runApp (getFile fileUri) config
       case either' of
         Left err          -> throwError $ err500 { errBody = errToLBS err }
