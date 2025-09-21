@@ -21,7 +21,7 @@ import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
 import           RainbowHash.User (User, userWebId)
-import           RainbowHash.View.File  (File (..))
+import           RainbowHash.View.File  (File (..), FileRow (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
 
@@ -46,7 +46,7 @@ homeHandler config user = do
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home user (File <$> recentFiles)
+    Right recentFiles -> pure $ Home user (FileRow <$> recentFiles)
 
 fileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
 fileHandler config _ mHost fileId =

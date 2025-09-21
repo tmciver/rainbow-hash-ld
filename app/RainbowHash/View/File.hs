@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module RainbowHash.View.File (File(..)) where
+module RainbowHash.View.File (File(..), FileRow(..)) where
 
 import           Protolude
 
@@ -18,7 +18,9 @@ import qualified RainbowHash.File     as RH
 
 newtype File = File RH.File
 
-instance ToHtml [File] where
+newtype FileRow = FileRow RH.File
+
+instance ToHtml [FileRow] where
   toHtml [] = pure ()
   toHtml files = do
     h2_ "Recent Files"
@@ -39,8 +41,8 @@ instance ToHtml [File] where
 
   toHtmlRaw = toHtml
 
-instance ToHtml File where
-  toHtml (File f) = do
+instance ToHtml FileRow where
+  toHtml (FileRow f) = do
     tr_ $ do
       td_ (toHtml . fromMaybe "" . RH.fileName $ f)
       td_ (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
@@ -57,4 +59,28 @@ instance ToHtml File where
           showUTCTime :: UTCTime -> Text
           showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
 
+  toHtmlRaw = toHtml
+
+instance ToHtml File where
+  toHtml (File f) = html_ $ do
+    head_ $ do
+      link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
+      link_ [rel_ "stylesheet", href_ "/static/style.css"]
+    body_ $ do
+      div_ [class_ "body-wrapper"] $ do
+        h1_ "File"
+        table_ [ makeAttribute "border" "1"
+               , classes_ ["table", "table-bordered", "table-hover"]
+               ] $ do
+          thead_ [class_ "thead-dark"] $ do
+            tr_ $ do
+              th_ "File name"
+              th_ "Size (bytes)"
+              th_ "Title"
+              th_ "Description"
+              th_ "Media Type"
+              th_ "Created"
+              th_ "Last Modified"
+              th_ "Content"
+          tbody_ (toHtml $ FileRow f)
   toHtmlRaw = toHtml
