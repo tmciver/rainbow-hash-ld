@@ -25,7 +25,8 @@ import           RainbowHash.View.HTML  (HTML)
 type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
-    :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
+    :<|> "files" :> Header "Host" Text
+                 :> MultipartForm Tmp (MultipartData Tmp)
                  :> Post '[JSON] NoContent)
   :<|> "static" :> Raw
 
@@ -47,18 +48,26 @@ homeHandler config user = do
 filesHandler
   :: Config
   -> User
+  -> Maybe Text
   -> MultipartData Tmp
   -> Handler NoContent
-filesHandler config user multipartData = do
+filesHandler config user mHost multipartData = do
   case files multipartData of
-    [fileData] -> uploadFile fileData (inputs multipartData)
+    [fileData] ->
+      -- Use either the host provided by the user or the one provied in the Host
+      -- header with a preference for the user-specified one. If neither is
+      -- present, use defaultHost
+      let defaultHost = "example.com"
+          host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
+      in uploadFile host fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
-          :: FileData Tmp
+          :: Text
+          -> FileData Tmp
           -> [Input]
           -> Handler NoContent
-        uploadFile fileData fields = do
+        uploadFile host' fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -68,7 +77,7 @@ filesHandler config user multipartData = do
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
 
-          either' <- liftIO $ runApp (putFile filePath (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right _ -> throwError err303 { errHeaders = [("Location", "/")] }

@@ -58,10 +58,10 @@ instance FilePut AppM FilePath where
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
-  putFileMetadata blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt = do
+  putFileMetadata host blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt = do
     logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt
+    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt
 
     logInfoN "Preparing to POST data to SPARQL endpoint"
 
