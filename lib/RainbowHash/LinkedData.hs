@@ -85,7 +85,10 @@ putFile
   -> m URI
 putFile v host createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
 
-  logInfoN $ "Adding file " <> fromMaybe "<unnamed>" maybeFileName <> " with title " <> fromMaybe "<notitle>" maybeTitle
+  logInfoN $ "Adding file "
+    <> fromMaybe "<unnamed>" (maybeFileName <&> \fn -> "\"" <> fn <> "\"")
+    <> " with title "
+    <> fromMaybe "<notitle>" (maybeTitle <&> \title -> "\"" <> title <> "\"")
 
   -- Get the current time
   t <- getCurrentTime
