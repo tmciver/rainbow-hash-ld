@@ -29,7 +29,7 @@ type FilesAPI =
     :<|> "files" :> Header "Host" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> Post '[JSON] NoContent
-    :<|> "file" :> Capture "fileId" Text :> Get '[HTML] File)
+    :<|> "file" :> Header "Host" Text :> Capture "fileId" Text :> Get '[HTML] File)
   :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
@@ -46,10 +46,13 @@ homeHandler config user = do
     Left err          -> throwError $ err500 { errBody = errToLBS err }
     Right recentFiles -> pure $ Home user (File <$> recentFiles)
 
-fileHandler :: Config -> User -> Text -> Handler File
-fileHandler config _ fileId =
-  case mkURI fileId of
-    Nothing -> throwError $ err400 { errBody = "Invalid file identifier." }
+fileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
+fileHandler config _ mHost fileId =
+  let defaultHost = "example.com"
+      host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
+      uriText = "http://" <> host <> "/file/" <> fileId
+  in case mkURI uriText of
+    Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
     Just fileUri -> do
       either' <- liftIO $ runApp (getFile fileUri) config
       case either' of
