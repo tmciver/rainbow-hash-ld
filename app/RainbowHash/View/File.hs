@@ -5,6 +5,7 @@ module RainbowHash.View.File (File(..)) where
 import           Protolude
 
 import qualified Data.CaseInsensitive as CI
+import Data.Coerce (coerce)
 import           Data.Text            as T
 import           Data.Text.Encoding   as T
 import           Data.Time.Clock      (UTCTime)
@@ -22,9 +23,9 @@ newtype FileRow = FileRow RH.File
 
 instance ToHtml [File] where
   toHtml [] = pure ()
-  toHtml files =
-    let fileRows = (\(File f) -> FileRow f) <$> files
-    in do
+  toHtml files = do
+    let fileRows :: [FileRow]
+        fileRows = coerce files
     h2_ "Recent Files"
     table_ [ makeAttribute "border" "1"
            , classes_ ["table", "table-bordered", "table-hover"]
