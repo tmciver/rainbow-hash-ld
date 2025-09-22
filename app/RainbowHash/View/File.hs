@@ -73,17 +73,36 @@ instance ToHtml File where
       div_ [class_ "body-wrapper"] $ do
         h1_ "File"
         table_ [ makeAttribute "border" "1"
-               , classes_ ["table", "table-bordered", "table-hover"]
+               , classes_ ["table", "table-bordered"]
                ] $ do
-          thead_ [class_ "thead-dark"] $ do
+          tbody_ $ do
             tr_ $ do
               th_ "File name"
+              td_ (toHtml . fromMaybe "" . RH.fileName $ f)
+            tr_ $ do
               th_ "Size (bytes)"
+              td_ (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
+            tr_ $ do
               th_ "Title"
+              td_ (toHtml . fromMaybe "" . RH.fileTitle $ f)
+            tr_ $ do
               th_ "Description"
+              td_ (toHtml . fromMaybe "" . RH.fileDescription $ f)
+            tr_ $ do
               th_ "Media Type"
+              td_ (toHtml . showMediaType . RH.fileMediaType $ f)
+            tr_ $ do
               th_ "Created"
+              td_ (toHtml . showUTCTime . RH.fileCreatedAt $ f)
+            tr_ $ do
               th_ "Last Modified"
-              th_ "Content"
-          tbody_ (toHtml $ FileRow f)
+              td_ (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
+        h2_ "Content"
+        iframe_ [src_ (render . RH.fileContent $ f), width_ "100%", height_ "600"] (toHtml ("" :: Text))
+
+    where showMediaType :: MediaType -> Text
+          showMediaType mt = T.decodeUtf8 . CI.original $ mainType mt <> "/" <> subType mt
+
+          showUTCTime :: UTCTime -> Text
+          showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
   toHtmlRaw = toHtml
