@@ -7,8 +7,7 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module RainbowHash.Servant
-  ( WebID
-  , WebIDUserAuth
+  ( WebIDUserAuth
   , genAuthServerContext
   ) where
 
