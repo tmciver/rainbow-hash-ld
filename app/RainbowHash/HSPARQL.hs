@@ -3,6 +3,7 @@
 module RainbowHash.HSPARQL
   ( getRecentFiles
   , getFileForContent
+  , getFile
   ) where
 
 import           Protolude
@@ -200,6 +201,151 @@ getRecentFiles sparqlEndpoint = do
           Nothing -> throwError $ BindingValueError UnboundValue
           Just mv -> mv
 
+getFile :: URI -> URI -> IO (Maybe File)
+getFile sparqlEndpoint fileUriToGet = do
+  let query = fileQuery fileUriToGet
+  -- Log the SPARQL query
+  writeLog LevelDebug (pack . createSelectQuery $ query)
+
+  maybeBvss <- selectQuery (unpack $ render sparqlEndpoint) query
+
+  -- Log the returned binding values
+  writeLog LevelDebug (show maybeBvss)
+
+  let (errors, files) = maybeBvss & maybe [] toFiles
+                                  & partitionEithers
+
+  -- log errors
+  forM_ errors logSparqlError
+
+  pure $ listToMaybe files
+
+  where toFiles
+          :: MonadError HsparqlError m
+          => [[BindingValue]]
+          -> [m File]
+        toFiles = fmap toFile
+
+        toFile
+          :: MonadError HsparqlError m
+          => [BindingValue]
+          -> m File
+        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+          fileUri' <- getUri fileUriBV
+          maybeFileName <- getPlainLiteralMaybe fileNameBV
+          fileSize' <- getFileSize fileSizeBV
+          maybeTitle <- getPlainLiteralMaybe titleBV
+          maybeDesc <- getPlainLiteralMaybe descBV
+          mediaType <- getMediaType mediaTypeBV
+          createdAt <- getCreatedAt createdBV
+          maybeUpdatedAt <- getUpdatedAt updatedBV
+          let updatedAt = fromMaybe createdAt maybeUpdatedAt
+          contentUrl <- getUri contentUrlBV
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
+        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
+
+        getUri
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m URI
+        getUri = parseUnboundAsError parseUri
+          where parseUri
+                  :: MonadError HsparqlError m
+                  => Node
+                  -> m URI
+                parseUri (UNode uriText) = case mkURI uriText of
+                  Nothing -> throwError $ BindingValueError $ URIParseError uriText
+                  Just uri -> pure uri
+                parseUri node = throwError $ BindingValueError $ NonURINodeError node
+
+        parsePlainLiteralNode
+          :: MonadError HsparqlError m
+          => Node
+          -> m Text
+        parsePlainLiteralNode (LNode (PlainL t)) = pure t
+        parsePlainLiteralNode n = throwError $ BindingValueError $ LiteralParseError n
+
+        getPlainLiteralMaybe
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m (Maybe Text)
+        getPlainLiteralMaybe = sequence . parseBoundNode parsePlainLiteralNode
+
+        getPlainLiteral
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m Text
+        getPlainLiteral = parseUnboundAsError parsePlainLiteralNode
+
+        getMediaType
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m MediaType
+        getMediaType = (parseMediaType' =<<) . getPlainLiteral
+          where parseMediaType'
+                  :: MonadError HsparqlError m
+                  => Text
+                  -> m MediaType
+                parseMediaType' t =
+                  case parseAccept $ T.encodeUtf8 t of
+                    Just mt -> pure mt
+                    Nothing -> throwError $ BindingValueError $ MediaTypeParseError t
+
+        getCreatedAt
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m UTCTime
+        getCreatedAt = parseUnboundAsError parseDateTimeNode
+
+        getUpdatedAt
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m (Maybe UTCTime)
+        getUpdatedAt = sequence . parseBoundNode parseDateTimeNode
+
+        parseDateTimeNode
+          :: MonadError HsparqlError m
+          => Node
+          -> m UTCTime
+        parseDateTimeNode (LNode (TypedL iso8601Text _)) =
+          case iso8601ParseM (unpack iso8601Text) of
+            Nothing -> throwError $ DateTimeParseError iso8601Text
+            Just t  -> pure t
+        parseDateTimeNode node = throwError $ BindingValueError $ NonLiteralNode node
+
+        getFileSize
+          :: MonadError HsparqlError m
+          => BindingValue
+          -> m Integer
+        getFileSize = parseUnboundAsError parseFileSizeNode
+
+        parseFileSizeNode
+          :: MonadError HsparqlError m
+          => Node
+          -> m Integer
+        parseFileSizeNode node@(LNode (TypedL sizeText _)) =
+          case readMaybe sizeText of
+            Nothing -> throwError $ BindingValueError $ LiteralParseError node
+            Just s  -> pure s
+        parseFileSizeNode node = throwError $ BindingValueError $ NonLiteralNode node
+
+        parseBoundNode
+          :: MonadError HsparqlError m
+          => (Node -> m a)
+          -> BindingValue
+          -> Maybe (m a)
+        parseBoundNode _ Unbound      = Nothing
+        parseBoundNode f (Bound node) = Just (f node)
+
+        parseUnboundAsError
+          :: MonadError HsparqlError m
+          => (Node -> m a)
+          -> BindingValue
+          -> m a
+        parseUnboundAsError f bv = case parseBoundNode f bv of
+          Nothing -> throwError $ BindingValueError UnboundValue
+          Just mv -> mv
+
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
   -- prefixes
@@ -232,6 +378,41 @@ recentFilesQuery = do
   orderNextDesc created
 
   limit_ 10
+
+  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
+
+fileQuery :: URI -> Query SelectQuery
+fileQuery fileUriToGet = do
+  -- prefixes
+  fo <- prefix "fo" (iriRef "http://timmciver.com/file-ontology#")
+  dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
+
+  -- variables
+  fileIri <- var
+  fileDataIri <- var
+  name <- var
+  size <- var
+  title <- var
+  desc <- var
+  mediaType <- var
+  created <- var
+  updated <- var
+  contentUrl <- var
+
+  -- where clause
+  triple_ fileIri (fo .:. "fileData") fileDataIri
+  triple_ fileDataIri (fo .:. "contentUrl") contentUrl
+  optional_ (triple_ fileIri (fo .:. "fileName") name)
+  optional_ (triple_ fileIri (dct .:. "title") title)
+  optional_ (triple_ fileIri (dct .:. "description") desc)
+  triple_ fileIri (fo .:. "size") size
+  triple_ fileIri (dct .:. "format") mediaType
+  triple_ fileIri (dct .:. "created") created
+  triple_ fileIri (dct .:. "modified") updated
+
+  filter_ (fileIri .==. iriRef (render fileUriToGet))
+
+  limit_ 1
 
   selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
 
