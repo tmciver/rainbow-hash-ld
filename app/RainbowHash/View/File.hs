@@ -39,22 +39,23 @@ instance ToHtml [File] where
           th_ "Media Type"
           th_ "Created"
           th_ "Last Modified"
-          th_ "Content"
       tbody_ (foldMap toHtml fileRows)
 
   toHtmlRaw = toHtml
 
 instance ToHtml FileRow where
-  toHtml (FileRow f) = do
-    tr_ $ do
-      td_ (toHtml . fromMaybe "" . RH.fileName $ f)
-      td_ (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
-      td_ (toHtml . fromMaybe "" . RH.fileTitle $ f)
-      td_ (toHtml . fromMaybe "" . RH.fileDescription $ f)
-      td_ (toHtml . showMediaType . RH.fileMediaType $ f)
-      td_ (toHtml . showUTCTime . RH.fileCreatedAt $ f)
-      td_ (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
-      td_ (a_ [href_ (render . RH.fileContent $ f)] (toHtml ("Link" :: Text)))
+  toHtml (FileRow f) =
+    let fileLink = render (RH.fileUri f)
+        linkAttrs = [href_ fileLink, style_ "color: inherit; text-decoration: none; display: block;"]
+        linkedCell content = td_ $ a_ linkAttrs content
+    in tr_ $ do
+      linkedCell (toHtml . fromMaybe "" . RH.fileName $ f)
+      linkedCell (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
+      linkedCell (toHtml . fromMaybe "" . RH.fileTitle $ f)
+      linkedCell (toHtml . fromMaybe "" . RH.fileDescription $ f)
+      linkedCell (toHtml . showMediaType . RH.fileMediaType $ f)
+      linkedCell (toHtml . showUTCTime . RH.fileCreatedAt $ f)
+      linkedCell (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
 
     where showMediaType :: MediaType -> Text
           showMediaType mt = T.decodeUtf8 . CI.original $ mainType mt <> "/" <> subType mt
