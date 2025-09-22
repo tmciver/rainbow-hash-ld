@@ -7,14 +7,17 @@ module RainbowHash.Server (app) where
 
 import           Protolude              hiding (Handler)
 
+import           Control.Monad.Logger          (LogLevel(LevelInfo))
 import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
+import           Text.URI               (mkURI)
 
+import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import           RainbowHash.Config     (Config (..))
-import           RainbowHash.LinkedData (FileNodeCreateOption (..),
+import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
 import           RainbowHash.User (User, userWebId)
@@ -25,12 +28,19 @@ import           RainbowHash.View.HTML  (HTML)
 type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
-    :<|> "files" :> MultipartForm Tmp (MultipartData Tmp)
-                 :> Post '[JSON] NoContent)
+    :<|> "files" :> Header "Host" Text
+                 :> MultipartForm Tmp (MultipartData Tmp)
+                 :> Post '[JSON] NoContent
+    :<|> "file"  :> Header "Host" Text
+                 :> Capture "fileId" Text
+                 :> Get '[HTML] File)
   :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
 api = Proxy
+
+errToLBS :: AppError -> LBS.ByteString
+errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
 
 homeHandler :: Config -> User -> Handler Home
 homeHandler config user = do
@@ -40,25 +50,44 @@ homeHandler config user = do
     Left err          -> throwError $ err500 { errBody = errToLBS err }
     Right recentFiles -> pure $ Home user (File <$> recentFiles)
 
-  where
-    errToLBS :: AppError -> LBS.ByteString
-    errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
+fileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
+fileHandler config _ mHost fileId =
+  let defaultHost = "example.com"
+      host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
+      uriText = "http://" <> host <> "/file/" <> fileId
+  in case mkURI uriText of
+    Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
+    Just fileUri -> do
+      liftIO $ writeLog LevelInfo $ "Getting file: " <> uriText
+      either' <- liftIO $ runApp (getFile fileUri) config
+      case either' of
+        Left err          -> throwError $ err500 { errBody = errToLBS err }
+        Right Nothing     -> throwError err404
+        Right (Just file) -> pure $ File file
 
 filesHandler
   :: Config
   -> User
+  -> Maybe Text
   -> MultipartData Tmp
   -> Handler NoContent
-filesHandler config user multipartData = do
+filesHandler config user mHost multipartData = do
   case files multipartData of
-    [fileData] -> uploadFile fileData (inputs multipartData)
+    [fileData] ->
+      -- Use either the host provided by the user or the one provied in the Host
+      -- header with a preference for the user-specified one. If neither is
+      -- present, use defaultHost
+      let defaultHost = "example.com"
+          host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
+      in uploadFile host fileData (inputs multipartData)
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
-          :: FileData Tmp
+          :: Text
+          -> FileData Tmp
           -> [Input]
           -> Handler NoContent
-        uploadFile fileData fields = do
+        uploadFile host' fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -68,7 +97,7 @@ filesHandler config user multipartData = do
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
 
-          either' <- liftIO $ runApp (putFile filePath (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right _ -> throwError err303 { errHeaders = [("Location", "/")] }
@@ -97,14 +126,11 @@ filesHandler config user multipartData = do
                 boolToFNCO True  = AlwaysCreate
                 boolToFNCO False = CreateIfNotExists
 
-        errToLBS :: AppError -> LBS.ByteString
-        errToLBS = LBS.fromStrict . encodeUtf8 . appErrorToString
-
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
 server :: Config -> Server FilesAPI
-server config = (\authedUser -> homeHandler config authedUser :<|> filesHandler config authedUser) :<|> staticHandler
+server config = (\authedUser -> homeHandler config authedUser :<|> filesHandler config authedUser :<|> fileHandler config authedUser) :<|> staticHandler
 
 app :: Config -> Application
 app config = serveWithContext api genAuthServerContext (server config)

@@ -9,13 +9,14 @@ module RainbowHash.Options
 import           Protolude
 
 import Numeric.Natural (Natural)
-import           Options.Applicative (Parser, ReadM, showDefault, eitherReader, metavar, value, option, auto, long, short, help, helper, info, progDesc, ParserInfo, fullDesc, header)
+import           Options.Applicative (Parser, ReadM, showDefault, eitherReader, metavar, value, option, strOption, auto, long, short, help, helper, info, progDesc, ParserInfo, fullDesc, header)
 import           Text.URI            (URI, mkURI)
 
 data Options = Options
   { port           :: Natural
   , fileStoreUrl   :: URI
   , sparqlEndpoint :: URI
+  , defaultHost :: Maybe Text
   }
 
 optionsParser :: Parser Options
@@ -35,6 +36,10 @@ optionsParser = Options
       ( long "sparql-url"
      <> help "URL of the SPARQL endpoint."
      <> metavar "URL" )
+  <*> optional (strOption
+      ( long "default-host"
+     <> help "Hostname to use if Host header is absent."
+     <> metavar "HOST" ))
 
 uri :: ReadM URI
 uri = eitherReader $ first (const "Could not parse URL") . mkURI . toS

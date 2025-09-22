@@ -24,7 +24,8 @@ import           Text.URI                 (URI, mkURI, render)
 -- TODO: Make this generic. It doesn't appear to need IO.
 fileDataToRDF
   :: (Rdf a)
-  => URI -- ^URI to the bytes of the file content.
+  => Text
+  -> URI -- ^URI to the bytes of the file content.
   -> URI -- ^URI of the agent that created the file.
   -> Maybe Text -- ^filename
   -> Integer    -- ^file size
@@ -33,15 +34,13 @@ fileDataToRDF
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF blobUrl agentUri maybeFileName size maybeTitle maybeDesc time mt = do
-  -- FIXME: Replace example.com
-  let baseUrlText :: Text
-      baseUrlText = "http://example.com/data/"
+fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time mt = do
+  let baseUrlText = "http://" <> host
 
   fileId <- nextRandom
-  fileUri <- mkURI $ baseUrlText <> toText fileId
+  fileUri <- mkURI $ baseUrlText <> "/file/" <> toText fileId
   fileDataId <- nextRandom
-  fileDataUri <- mkURI $ baseUrlText <> toText fileDataId
+  fileDataUri <- mkURI $ baseUrlText <> "/file/" <> toText fileDataId
 
   let fileUriNode = unode $ render fileUri
       fileDataUriNode = unode $ render fileDataUri

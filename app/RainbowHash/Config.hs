@@ -2,25 +2,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module RainbowHash.Config
-  ( getConfig
-  , Config(..)
+  ( Config(..)
   ) where
 
-import           Protolude
+import Protolude
 
--- use of fromJust will go away once we're no longer hard-coding data here.
-import           Data.Maybe (fromJust)
-import           Text.URI   (URI, mkURI)
+import           Text.URI   (URI)
 
 data Config = Config
   { blobStoreUrl   :: URI
   , sparqlEndpoint :: URI
+  -- If present, use the configured host over that provided in the Host header
+  , preferredHost :: Maybe Text
   }
-
-getConfig :: IO Config
-getConfig = do
-  let blobStorageUrl :: URI
-      blobStorageUrl = "http://localhost:3000/blobs" & mkURI & fromJust
-      sparqlEndpoint' :: URI
-      sparqlEndpoint' = "http://localhost:3030/ds" & mkURI & fromJust
-  pure $ Config blobStorageUrl sparqlEndpoint'
