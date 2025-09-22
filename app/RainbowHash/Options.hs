@@ -39,8 +39,6 @@ optionsParser = Options
   <*> optional (strOption
       ( long "default-host"
      <> help "Hostname to use if Host header is absent."
-     <> value "example.com"
-     <> showDefault
      <> metavar "HOST" ))
 
 uri :: ReadM URI

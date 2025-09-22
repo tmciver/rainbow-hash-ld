@@ -31,7 +31,9 @@ type FilesAPI =
     :<|> "files" :> Header "Host" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> Post '[JSON] NoContent
-    :<|> "file" :> Header "Host" Text :> Capture "fileId" Text :> Get '[HTML] File)
+    :<|> "file"  :> Header "Host" Text
+                 :> Capture "fileId" Text
+                 :> Get '[HTML] File)
   :<|> "static" :> Raw
 
 api :: Proxy FilesAPI

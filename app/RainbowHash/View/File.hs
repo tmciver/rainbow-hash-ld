@@ -46,8 +46,11 @@ instance ToHtml [File] where
 instance ToHtml FileRow where
   toHtml (FileRow f) =
     let fileLink = render (RH.fileUri f)
-        linkAttrs = [href_ fileLink, style_ "color: inherit; text-decoration: none; display: block;"]
-        linkedCell content = td_ $ a_ linkAttrs content
+        linkedCell ::
+          Applicative m
+          => HtmlT m ()
+          -> HtmlT m ()
+        linkedCell content = td_ $ a_ [href_ fileLink] content
     in tr_ $ do
       linkedCell (toHtml . fromMaybe "" . RH.fileName $ f)
       linkedCell (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
