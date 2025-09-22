@@ -99,108 +99,6 @@ getRecentFiles sparqlEndpoint = do
           pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
 
-        getUri
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m URI
-        getUri = parseUnboundAsError parseUri
-          where parseUri
-                  :: MonadError HsparqlError m
-                  => Node
-                  -> m URI
-                parseUri (UNode uriText) = case mkURI uriText of
-                  Nothing -> throwError $ BindingValueError $ URIParseError uriText
-                  Just uri -> pure uri
-                parseUri node = throwError $ BindingValueError $ NonURINodeError node
-
-        parsePlainLiteralNode
-          :: MonadError HsparqlError m
-          => Node
-          -> m Text
-        parsePlainLiteralNode (LNode (PlainL t)) = pure t
-        parsePlainLiteralNode n = throwError $ BindingValueError $ LiteralParseError n
-
-        getPlainLiteralMaybe
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m (Maybe Text)
-        getPlainLiteralMaybe = sequence . parseBoundNode parsePlainLiteralNode
-
-        getPlainLiteral
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m Text
-        getPlainLiteral = parseUnboundAsError parsePlainLiteralNode
-
-        getMediaType
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m MediaType
-        getMediaType = (parseMediaType' =<<) . getPlainLiteral
-          where parseMediaType'
-                  :: MonadError HsparqlError m
-                  => Text
-                  -> m MediaType
-                parseMediaType' t =
-                  case parseAccept $ T.encodeUtf8 t of
-                    Just mt -> pure mt
-                    Nothing -> throwError $ BindingValueError $ MediaTypeParseError t
-
-        getCreatedAt
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m UTCTime
-        getCreatedAt = parseUnboundAsError parseDateTimeNode
-
-        getUpdatedAt
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m (Maybe UTCTime)
-        getUpdatedAt = sequence . parseBoundNode parseDateTimeNode
-
-        parseDateTimeNode
-          :: MonadError HsparqlError m
-          => Node
-          -> m UTCTime
-        parseDateTimeNode (LNode (TypedL iso8601Text _)) =
-          case iso8601ParseM (unpack iso8601Text) of
-            Nothing -> throwError $ DateTimeParseError iso8601Text
-            Just t  -> pure t
-        parseDateTimeNode node = throwError $ BindingValueError $ NonLiteralNode node
-
-        getFileSize
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m Integer
-        getFileSize = parseUnboundAsError parseFileSizeNode
-
-        parseFileSizeNode
-          :: MonadError HsparqlError m
-          => Node
-          -> m Integer
-        parseFileSizeNode node@(LNode (TypedL sizeText _)) =
-          case readMaybe sizeText of
-            Nothing -> throwError $ BindingValueError $ LiteralParseError node
-            Just s  -> pure s
-        parseFileSizeNode node = throwError $ BindingValueError $ NonLiteralNode node
-
-        parseBoundNode
-          :: MonadError HsparqlError m
-          => (Node -> m a)
-          -> BindingValue
-          -> Maybe (m a)
-        parseBoundNode _ Unbound      = Nothing
-        parseBoundNode f (Bound node) = Just (f node)
-
-        parseUnboundAsError
-          :: MonadError HsparqlError m
-          => (Node -> m a)
-          -> BindingValue
-          -> m a
-        parseUnboundAsError f bv = case parseBoundNode f bv of
-          Nothing -> throwError $ BindingValueError UnboundValue
-          Just mv -> mv
-
 getFile :: URI -> URI -> IO (Maybe File)
 getFile sparqlEndpoint fileUriToGet = do
   let query = fileQuery fileUriToGet
@@ -234,108 +132,6 @@ getFile sparqlEndpoint fileUriToGet = do
           contentUrl <- getUri contentUrlBV
           pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
         toFile _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 8
-
-        getUri
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m URI
-        getUri = parseUnboundAsError parseUri
-          where parseUri
-                  :: MonadError HsparqlError m
-                  => Node
-                  -> m URI
-                parseUri (UNode uriText) = case mkURI uriText of
-                  Nothing -> throwError $ BindingValueError $ URIParseError uriText
-                  Just uri -> pure uri
-                parseUri node = throwError $ BindingValueError $ NonURINodeError node
-
-        parsePlainLiteralNode
-          :: MonadError HsparqlError m
-          => Node
-          -> m Text
-        parsePlainLiteralNode (LNode (PlainL t)) = pure t
-        parsePlainLiteralNode n = throwError $ BindingValueError $ LiteralParseError n
-
-        getPlainLiteralMaybe
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m (Maybe Text)
-        getPlainLiteralMaybe = sequence . parseBoundNode parsePlainLiteralNode
-
-        getPlainLiteral
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m Text
-        getPlainLiteral = parseUnboundAsError parsePlainLiteralNode
-
-        getMediaType
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m MediaType
-        getMediaType = (parseMediaType' =<<) . getPlainLiteral
-          where parseMediaType'
-                  :: MonadError HsparqlError m
-                  => Text
-                  -> m MediaType
-                parseMediaType' t =
-                  case parseAccept $ T.encodeUtf8 t of
-                    Just mt -> pure mt
-                    Nothing -> throwError $ BindingValueError $ MediaTypeParseError t
-
-        getCreatedAt
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m UTCTime
-        getCreatedAt = parseUnboundAsError parseDateTimeNode
-
-        getUpdatedAt
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m (Maybe UTCTime)
-        getUpdatedAt = sequence . parseBoundNode parseDateTimeNode
-
-        parseDateTimeNode
-          :: MonadError HsparqlError m
-          => Node
-          -> m UTCTime
-        parseDateTimeNode (LNode (TypedL iso8601Text _)) =
-          case iso8601ParseM (unpack iso8601Text) of
-            Nothing -> throwError $ DateTimeParseError iso8601Text
-            Just t  -> pure t
-        parseDateTimeNode node = throwError $ BindingValueError $ NonLiteralNode node
-
-        getFileSize
-          :: MonadError HsparqlError m
-          => BindingValue
-          -> m Integer
-        getFileSize = parseUnboundAsError parseFileSizeNode
-
-        parseFileSizeNode
-          :: MonadError HsparqlError m
-          => Node
-          -> m Integer
-        parseFileSizeNode node@(LNode (TypedL sizeText _)) =
-          case readMaybe sizeText of
-            Nothing -> throwError $ BindingValueError $ LiteralParseError node
-            Just s  -> pure s
-        parseFileSizeNode node = throwError $ BindingValueError $ NonLiteralNode node
-
-        parseBoundNode
-          :: MonadError HsparqlError m
-          => (Node -> m a)
-          -> BindingValue
-          -> Maybe (m a)
-        parseBoundNode _ Unbound      = Nothing
-        parseBoundNode f (Bound node) = Just (f node)
-
-        parseUnboundAsError
-          :: MonadError HsparqlError m
-          => (Node -> m a)
-          -> BindingValue
-          -> m a
-        parseUnboundAsError f bv = case parseBoundNode f bv of
-          Nothing -> throwError $ BindingValueError UnboundValue
-          Just mv -> mv
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
@@ -437,3 +233,109 @@ fileForContentQuery contentUrl = do
   limit_ 1
 
   selectVars [fileIri]
+
+-- Helper functions for parsing SPARQL responses --
+
+parseBoundNode
+  :: MonadError HsparqlError m
+  => (Node -> m a)
+  -> BindingValue
+  -> Maybe (m a)
+parseBoundNode _ Unbound      = Nothing
+parseBoundNode f (Bound node) = Just (f node)
+
+parseUnboundAsError
+  :: MonadError HsparqlError m
+  => (Node -> m a)
+  -> BindingValue
+  -> m a
+parseUnboundAsError f bv = case parseBoundNode f bv of
+  Nothing -> throwError $ BindingValueError UnboundValue
+  Just mv -> mv
+
+parseUri
+  :: MonadError HsparqlError m
+  => Node
+  -> m URI
+parseUri (UNode uriText) = case mkURI uriText of
+  Nothing -> throwError $ BindingValueError $ URIParseError uriText
+  Just uri -> pure uri
+parseUri node = throwError $ BindingValueError $ NonURINodeError node
+
+getUri
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m URI
+getUri = parseUnboundAsError parseUri
+
+parsePlainLiteralNode
+  :: MonadError HsparqlError m
+  => Node
+  -> m Text
+parsePlainLiteralNode (LNode (PlainL t)) = pure t
+parsePlainLiteralNode n = throwError $ BindingValueError $ LiteralParseError n
+
+getPlainLiteralMaybe
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m (Maybe Text)
+getPlainLiteralMaybe = sequence . parseBoundNode parsePlainLiteralNode
+
+getPlainLiteral
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m Text
+getPlainLiteral = parseUnboundAsError parsePlainLiteralNode
+
+parseMediaType'
+  :: MonadError HsparqlError m
+  => Text
+  -> m MediaType
+parseMediaType' t =
+  case parseAccept $ T.encodeUtf8 t of
+    Just mt -> pure mt
+    Nothing -> throwError $ BindingValueError $ MediaTypeParseError t
+
+getMediaType
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m MediaType
+getMediaType = (parseMediaType' =<<) . getPlainLiteral
+
+parseDateTimeNode
+  :: MonadError HsparqlError m
+  => Node
+  -> m UTCTime
+parseDateTimeNode (LNode (TypedL iso8601Text _)) =
+  case iso8601ParseM (unpack iso8601Text) of
+    Nothing -> throwError $ DateTimeParseError iso8601Text
+    Just t  -> pure t
+parseDateTimeNode node = throwError $ BindingValueError $ NonLiteralNode node
+
+getCreatedAt
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m UTCTime
+getCreatedAt = parseUnboundAsError parseDateTimeNode
+
+getUpdatedAt
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m (Maybe UTCTime)
+getUpdatedAt = sequence . parseBoundNode parseDateTimeNode
+
+parseFileSizeNode
+  :: MonadError HsparqlError m
+  => Node
+  -> m Integer
+parseFileSizeNode node@(LNode (TypedL sizeText _)) =
+  case readMaybe sizeText of
+    Nothing -> throwError $ BindingValueError $ LiteralParseError node
+    Just s  -> pure s
+parseFileSizeNode node = throwError $ BindingValueError $ NonLiteralNode node
+
+getFileSize
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m Integer
+getFileSize = parseUnboundAsError parseFileSizeNode
