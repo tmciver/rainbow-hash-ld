@@ -97,7 +97,7 @@ getRecentFiles sparqlEndpoint = do
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
           pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
-        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
+        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
 
         getUri
           :: MonadError HsparqlError m
@@ -212,26 +212,17 @@ getFile sparqlEndpoint fileUriToGet = do
   -- Log the returned binding values
   writeLog LevelDebug (show maybeBvss)
 
-  let (errors, files) = maybeBvss & maybe [] toFiles
-                                  & partitionEithers
+  pure $ case maybeBvss of
+    Nothing -> Nothing
+    Just [] -> Nothing
+    Just (bvs:_) -> hush $ toFile fileUriToGet bvs
 
-  -- log errors
-  forM_ errors logSparqlError
-
-  pure $ listToMaybe files
-
-  where toFiles
+  where toFile
           :: MonadError HsparqlError m
-          => [[BindingValue]]
-          -> [m File]
-        toFiles = fmap toFile
-
-        toFile
-          :: MonadError HsparqlError m
-          => [BindingValue]
+          => URI
+          -> [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
-          fileUri' <- getUri fileUriBV
+        toFile fileUri' [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
           maybeTitle <- getPlainLiteralMaybe titleBV
@@ -242,7 +233,7 @@ getFile sparqlEndpoint fileUriToGet = do
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
           pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
-        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 6
+        toFile _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 8
 
         getUri
           :: MonadError HsparqlError m
@@ -382,13 +373,12 @@ recentFilesQuery = do
   selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
 
 fileQuery :: URI -> Query SelectQuery
-fileQuery fileUriToGet = do
+fileQuery fileUri' = do
   -- prefixes
   fo <- prefix "fo" (iriRef "http://timmciver.com/file-ontology#")
   dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
 
   -- variables
-  fileIri <- var
   fileDataIri <- var
   name <- var
   size <- var
@@ -400,6 +390,7 @@ fileQuery fileUriToGet = do
   contentUrl <- var
 
   -- where clause
+  let fileIri = iriRef (render fileUri')
   triple_ fileIri (fo .:. "fileData") fileDataIri
   triple_ fileDataIri (fo .:. "contentUrl") contentUrl
   optional_ (triple_ fileIri (fo .:. "fileName") name)
@@ -410,11 +401,9 @@ fileQuery fileUriToGet = do
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
 
-  filter_ (fileIri .==. iriRef (render fileUriToGet))
-
   limit_ 1
 
-  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
+  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl]
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do

@@ -48,7 +48,7 @@ runApp :: AppM a -> Config -> IO (Either AppError a)
 runApp (AppM except) = runReaderT (runExceptT except)
 
 instance FileGet AppM where
-  getFile _ = pure Nothing
+  getFile fileUri = asks sparqlEndpoint >>= liftIO . flip HSPARQL.getFile fileUri
   getRecentFiles = asks sparqlEndpoint >>= liftIO . HSPARQL.getRecentFiles
   getFileForContent contentUrl = asks sparqlEndpoint >>= liftIO . HSPARQL.getFileForContent contentUrl
 
