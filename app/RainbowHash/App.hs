@@ -35,11 +35,13 @@ import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 import           RainbowHash.RDF4H             (fileDataToRDF)
 
-newtype AppError = HTTPClientError HTTPClientError
-  deriving (Show)
+data AppError
+  = HTTPClientError HTTPClientError
+  | SparqlError HSPARQL.SparqlError
 
 appErrorToString :: AppError -> Text
 appErrorToString (HTTPClientError hce) = httpClientErrorToString hce
+appErrorToString (SparqlError sparqlError) = HSPARQL.sparqlErrorToText sparqlError
 
 newtype AppM a = AppM (ExceptT AppError (ReaderT Config IO) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadError AppError, MonadMask, MonadCatch, MonadThrow)
@@ -70,6 +72,9 @@ instance MetadataPut AppM where
     mapError HTTPClientError (postToSPARQL gspUri rdf)
 
     pure url
+
+  updateFileGraphWithContent fileUri blobUrl agentUri size time =
+    mapError SparqlError $ HSPARQL.updateFileGraphWithContent fileUri blobUrl agentUri size time
 
 instance MediaTypeDiscover AppM FilePath where
   getMediaType = liftIO . discoverMediaTypeFP
