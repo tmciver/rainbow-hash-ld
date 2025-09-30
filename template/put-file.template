@@ -8,18 +8,16 @@ DELETE
 INSERT
 {
   <{{fileDataUri}}> a fo:FileData ;
-                    fo:contentUrl <{{contentUrl}}> ;
+                    fo:contentUrl <{{fileContentUrl}}> ;
                     fo:size "{{size}}"^^xsd:integer ;
-                    dct:created "{{created}}"^^xsd:dateTime ;
+                    dct:created "{{creationTime}}"^^xsd:dateTime ;
                     dct:creator <{{agentUri}}> .
 
   <{{fileUri}}> fo:fileData <{{fileDataUri}}> ;
                 fo:size "{{size}}"^^xsd:integer ;
-                dct:modified "{{created}}"^^xsd:dateTime .
+                dct:modified "{{creationTime}}"^^xsd:dateTime .
 }
 WHERE
 {
-  <{{fileUri}}> fo:fileData ?oldFileDataUri ;
-                dct:modified ?modified ;
-                fo:size ?size .
+  <{{fileUri}}> fo:fileData ?oldFileDataUri .
 }

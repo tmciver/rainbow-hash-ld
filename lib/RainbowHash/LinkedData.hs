@@ -59,7 +59,8 @@ class Monad m => MetadataPut m where
     -> m URI
 
   updateFileGraphWithContent
-    :: URI -- ^File object URI
+    :: Text -- ^Hostname from HTTP request
+    -> URI -- ^File object URI
     -> URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
     -> Integer    -- ^file size
@@ -154,12 +155,13 @@ updateFileContent
      , MonadError FileError m
      , MonadLogger m
      )
-  => URI -- ^URI of File object to be updated
+  => Text -- ^Hostname from HTTP request
+  -> URI -- ^URI of File object to be updated
   -> v   -- ^File content
   -> URI -- ^URI of agent putting the file
   -> Maybe MediaType
   -> m ()
-updateFileContent fileUri v createdByUri maybeMT = do
+updateFileContent host fileUri v createdByUri maybeMT = do
   logInfoN $ "Updating file " <> render fileUri
 
   -- Get the file object for the given fle URI
@@ -185,10 +187,12 @@ updateFileContent fileUri v createdByUri maybeMT = do
 
   -- Check to see if the new content is the same as the existing content.
   -- If so, nothing will be done.
-  when (blobUrl /= fileContent file) $ do
-    logInfoN $ "Added file to store at URL " <> render blobUrl
-
-    updateFileGraphWithContent fileUri blobUrl createdByUri size t
+  if blobUrl /= fileContent file
+    then do
+      logInfoN $ "Added file to store at URL " <> render blobUrl
+      updateFileGraphWithContent host fileUri blobUrl createdByUri size t
+    else
+      logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged"
 
 -- Logs the data used to create a file object.
 -- Takes the file URI argument last and returns it to facilitate monadic

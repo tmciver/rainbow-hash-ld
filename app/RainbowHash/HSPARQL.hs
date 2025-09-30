@@ -15,6 +15,8 @@ module RainbowHash.HSPARQL
 
 import           Protolude
 
+import           Data.UUID                (toText)
+import           Data.UUID.V4             (nextRandom)
 import qualified Text.Parsec.Error as P
 import qualified Data.Text                             as T
 import qualified Data.Text.Encoding                    as T
@@ -355,24 +357,36 @@ getFileSize
   -> m Integer
 getFileSize = parseUnboundAsError parseFileSizeNode
 
+mkURI'
+  :: MonadError SparqlError m
+  => Text
+  -> m URI
+mkURI' t = maybe (throwError $ MalformedURI t) pure (mkURI t)
+
 updateFileGraphWithContent
     :: ( MonadIO m
        , MonadReader env m
        , HasField "sparqlEndpoint" env URI
        , MonadError SparqlError m
        )
-    => URI -- ^File object URI
+    => Text -- ^host name
+    -> URI -- ^File object URI
     -> URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
     -> Integer    -- ^file size
     -> UTCTime -- ^file creation time
     -> m ()
-updateFileGraphWithContent fileUri blobUrl agentUri size time = do
-  let pfd = PutFileData fileUri blobUrl agentUri size time
+updateFileGraphWithContent host fileUri blobUrl agentUri size time = do
+  let baseUrlText = "http://" <> host
+  fileDataId <- liftIO nextRandom
+  fileDataUri <- mkURI' $ baseUrlText <> "/file-data/" <> toText fileDataId
+
+  let pfd = PutFileData fileUri fileDataUri blobUrl agentUri size time
   renderPutFileTemplate pfd >>= sparqlUpdate
 
 data PutFileData = PutFileData
-  { fileObjectUrl :: URI
+  { fileUri :: URI
+  , fileDataUri :: URI
   , fileContentUrl :: URI
   , agentUri :: URI
   , fileSize :: Integer
@@ -381,7 +395,8 @@ data PutFileData = PutFileData
 
 instance ToMustache PutFileData where
   toMustache PutFileData{..} = object
-    [ "fileObjectUrl" ~> render fileObjectUrl
+    [ "fileObjectUrl" ~> render fileUri
+    , "fileDataUri" ~> render fileDataUri
     , "fileContentUrl" ~> render fileContentUrl
     , "agentUri" ~> render agentUri
     , "size" ~> fileSize
@@ -393,6 +408,7 @@ data SparqlError
   | TemplateSubstitueError [SubstitutionError]
   | SparqlResponseError Status Text
   | SparqlRequestError Text
+  | MalformedURI Text
 
 sparqlErrorToText :: SparqlError -> Text
 sparqlErrorToText (TemplateCompileError pe) =
@@ -408,6 +424,7 @@ sparqlErrorToText (SparqlResponseError status  msg) =
   "SPARQL response error: status: " <> show status <> ", error message: " <> msg
 sparqlErrorToText (SparqlRequestError msg) =
   "SPARQL request error: " <> msg
+sparqlErrorToText (MalformedURI t) = "Malformed URI: " <> t
 
 renderPutFileTemplate
   :: ( MonadIO m
@@ -424,7 +441,7 @@ renderPutFileTemplate putFileData = do
     Left err -> throwError $ TemplateCompileError err --writeLog LevelError $ "Error rendering Mustache template: " <> show err
     Right template ->
       case checkedSubstitute template putFileData of
-        ([], t) -> pure t
+        ([], t) -> putStrLn t >> pure t
         (errs, _) -> throwError $ TemplateSubstitueError errs
 
 sparqlUpdate
@@ -446,10 +463,10 @@ checkStatusWithTextMessage
   => (a -> Text)
   -> Response a
   -> m ()
-checkStatusWithTextMessage toText resp = do
+checkStatusWithTextMessage toText' resp = do
   let status = responseStatus resp
   unless (statusIsSuccessful status) $
-    let msg = T.take 100 . toText . responseBody $ resp
+    let msg = T.take 100 . toText' . responseBody $ resp
     in throwError $ SparqlResponseError status msg
 
 responseToError

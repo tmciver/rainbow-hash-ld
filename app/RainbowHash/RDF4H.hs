@@ -40,7 +40,7 @@ fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time
   fileId <- nextRandom
   fileUri <- mkURI $ baseUrlText <> "/file/" <> toText fileId
   fileDataId <- nextRandom
-  fileDataUri <- mkURI $ baseUrlText <> "/file/" <> toText fileDataId
+  fileDataUri <- mkURI $ baseUrlText <> "/file-data/" <> toText fileDataId
 
   let fileUriNode = unode $ render fileUri
       fileDataUriNode = unode $ render fileDataUri
