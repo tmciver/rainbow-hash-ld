@@ -12,6 +12,8 @@ module RainbowHash.LinkedData
   , FileSizeGet(..)
   , Time(..)
   , FileNodeCreateOption(..)
+  , FileError(..)
+  , fileErrorToText
   ) where
 
 import           Protolude
@@ -36,6 +38,10 @@ data FileNodeCreateOption
 data FileError
   = FileNotFound URI
   | MediaTypeMismatch
+
+fileErrorToText :: FileError -> Text
+fileErrorToText (FileNotFound uri) = "File URI <" <> render uri <> "> not found."
+fileErrorToText MediaTypeMismatch = "Media type of new file content does not match existing content."
 
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
@@ -152,7 +158,6 @@ updateFileContent
      , FileNameGet m v
      , FileSizeGet m v
      , Time m
-     , MonadError FileError m
      , MonadLogger m
      )
   => Text -- ^Hostname from HTTP request
@@ -160,39 +165,44 @@ updateFileContent
   -> v   -- ^File content
   -> URI -- ^URI of agent putting the file
   -> Maybe MediaType
-  -> m ()
+  -> m (Either FileError ())
 updateFileContent host fileUri v createdByUri maybeMT = do
   logInfoN $ "Updating file " <> render fileUri
 
   -- Get the file object for the given fle URI
-  file <- getFile fileUri >>= maybe (throwError $ FileNotFound fileUri) pure
+  eitherFile <- getFile fileUri <&> maybe (Left $ FileNotFound fileUri) Right
 
-  -- Get the current time
-  t <- getCurrentTime
+  case eitherFile of
+    Left err -> pure $ Left err
+    Right file -> do
 
-  -- Use given media type or discover what it is.
-  mt <- maybe (getMediaType v) pure maybeMT
+      -- Get the current time
+      t <- getCurrentTime
 
-  -- media type of new content must be the same as the existing content
-  when (mt /= fileMediaType file) $
-    throwError MediaTypeMismatch
+      -- Use given media type or discover what it is.
+      mt <- maybe (getMediaType v) pure maybeMT
 
-  logInfoN $ "Media type: " <> show mt
+      -- media type of new content must be the same as the existing content
+      if mt /= fileMediaType file
+        then pure $ Left MediaTypeMismatch
+        else do
 
-  -- Get the file's size
-  size <- getFileSize v
+          logInfoN $ "Media type: " <> show mt
 
-  -- Add file to blob store.
-  blobUrl <- putFileInStore v
+          -- Get the file's size
+          size <- getFileSize v
 
-  -- Check to see if the new content is the same as the existing content.
-  -- If so, nothing will be done.
-  if blobUrl /= fileContent file
-    then do
-      logInfoN $ "Added file to store at URL " <> render blobUrl
-      updateFileGraphWithContent host fileUri blobUrl createdByUri size t
-    else
-      logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged"
+          -- Add file to blob store.
+          blobUrl <- putFileInStore v
+
+          -- Check to see if the new content is the same as the existing content.
+          -- If so, nothing will be done.
+          if blobUrl /= fileContent file
+            then do
+              logInfoN $ "Added file to store at URL " <> render blobUrl
+              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri size t
+            else
+              Right <$> (logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged")
 
 -- Logs the data used to create a file object.
 -- Takes the file URI argument last and returns it to facilitate monadic
