@@ -32,7 +32,7 @@ type FilesAPI =
   (Get '[HTML] Home
     :<|> "files" :> Header "Host" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
-                 :> Post '[JSON] NoContent
+                 :> PostNoContent
     :<|> "file"  :>
       (    Header "Host" Text
         :> Capture "fileId" Text
@@ -41,7 +41,7 @@ type FilesAPI =
            Header "Host" Text
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
-        :> Put '[JSON] NoContent
+        :> PutNoContent
       )
   )
   :<|> "static" :> Raw
