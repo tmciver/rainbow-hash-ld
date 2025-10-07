@@ -41,7 +41,7 @@ type FilesAPI =
            Header "Host" Text
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
-        :> PutNoContent
+        :> PostNoContent
       )
   )
   :<|> "static" :> Raw

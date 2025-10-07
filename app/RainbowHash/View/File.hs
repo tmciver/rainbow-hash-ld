@@ -2,7 +2,7 @@
 
 module RainbowHash.View.File (File(..)) where
 
-import           Protolude
+import           Protolude hiding (for_)
 
 import qualified Data.CaseInsensitive as CI
 import Data.Coerce (coerce)
@@ -101,6 +101,22 @@ instance ToHtml File where
             tr_ $ do
               th_ "Last Modified"
               td_ (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
+
+        form_
+          [ method_ "POST"
+          , action_ (filePostAction f)
+          , enctype_ "multipart/form-data"
+          ] $ do
+          div_ [class_ "form-group"] $ do
+            label_ [for_ "file-input"] "Upload New File Content"
+            input_ [ type_ "file"
+                   , name_ "file"
+                   , id_ "file-input"
+                   , class_ "form-control-file"
+                   ]
+
+          button_ [type_ "submit", classes_ ["btn", "btn-primary"]] (toHtml ("Submit" :: Text))
+
         h2_ "Content"
         iframe_ [src_ (render . RH.fileContent $ f), width_ "100%", height_ "600"] (toHtml ("" :: Text))
 
@@ -109,4 +125,10 @@ instance ToHtml File where
 
           showUTCTime :: UTCTime -> Text
           showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
+
+          filePostAction :: RH.File -> Text
+          filePostAction f' =
+            let urlText = render $ RH.fileUri f'
+            in "https" <> T.drop 4 urlText
+
   toHtmlRaw = toHtml

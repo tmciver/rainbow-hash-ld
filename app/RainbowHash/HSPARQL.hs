@@ -15,6 +15,7 @@ module RainbowHash.HSPARQL
 
 import           Protolude
 
+import Control.Monad.Logger (MonadLogger, logInfoN)
 import           Data.UUID                (toText)
 import           Data.UUID.V4             (nextRandom)
 import qualified Text.Parsec.Error as P
@@ -368,6 +369,7 @@ updateFileGraphWithContent
        , MonadReader env m
        , HasField "sparqlEndpoint" env URI
        , MonadError SparqlError m
+       , MonadLogger m
        )
     => Text -- ^host name
     -> URI -- ^File object URI
@@ -382,7 +384,9 @@ updateFileGraphWithContent host fileUri blobUrl agentUri size time = do
   fileDataUri <- mkURI' $ baseUrlText <> "/file-data/" <> toText fileDataId
 
   let pfd = PutFileData fileUri fileDataUri blobUrl agentUri size time
-  renderPutFileTemplate pfd >>= sparqlUpdate
+  renderPutFileTemplate pfd >>= logSparql >>= sparqlUpdate
+  where logSparql :: MonadLogger m => Text -> m Text
+        logSparql t = logInfoN t >> pure t
 
 data PutFileData = PutFileData
   { fileUri :: URI
@@ -395,7 +399,7 @@ data PutFileData = PutFileData
 
 instance ToMustache PutFileData where
   toMustache PutFileData{..} = object
-    [ "fileObjectUrl" ~> render fileUri
+    [ "fileUri" ~> render fileUri
     , "fileDataUri" ~> render fileDataUri
     , "fileContentUrl" ~> render fileContentUrl
     , "agentUri" ~> render agentUri
@@ -433,8 +437,8 @@ renderPutFileTemplate
   => PutFileData
   -> m Text
 renderPutFileTemplate putFileData = do
-  let searchSpace = ["../../template"]
-      templateName = "put-file.mustache"
+  let searchSpace = ["./template"]
+      templateName = "put-file.template"
 
   compiled <- liftIO $ automaticCompile searchSpace templateName
   case compiled of
