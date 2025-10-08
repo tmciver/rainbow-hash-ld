@@ -7,8 +7,7 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 DELETE
 { <{{fileUri}}> fo:fileData ?oldFileDataUri ;
                 fo:size ?oldFileSize ;
-                dct:modified ?oldModified ;
-                fo:contentUrl ?oldContentUrl .
+                dct:modified ?oldModified .
 }
 INSERT
 {
@@ -26,6 +25,5 @@ WHERE
 {
   <{{fileUri}}> fo:fileData ?oldFileDataUri ;
                 fo:size ?oldFileSize ;
-                dct:modified ?oldModified ;
-                fo:contentUrl ?oldContentUrl .
+                dct:modified ?oldModified .
 }
