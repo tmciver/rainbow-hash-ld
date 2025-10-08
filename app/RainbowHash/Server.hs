@@ -13,7 +13,7 @@ import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
-import           Text.URI               (mkURI)
+import           Text.URI               (mkURI, render)
 
 import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
@@ -96,10 +96,10 @@ putFileHandler config user mHost fileId multipartData =
               mMediaType :: Maybe MediaType
               mMediaType = Nothing
           eitherRes <- liftIO $ runApp (App.updateFileContent host fileUri filePath (userWebId user) mMediaType) config
-          case eitherRes of
+          void $ case eitherRes of
             -- TODO: dispatch on AppError values to determine what error to throw.
             Left appError -> throwError (err400 { errBody = errToLBS appError })
-            Right _ -> pure ()
+            Right _ -> throwError err303 { errHeaders = [("Location", encodeUtf8 . render $ fileUri)] }
           pure NoContent
         _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
