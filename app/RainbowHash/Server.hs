@@ -13,7 +13,7 @@ import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
-import           Text.URI               (mkURI, render)
+import           Text.URI               (URI, mkURI, render)
 
 import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
@@ -38,10 +38,18 @@ type FilesAPI =
         :> Capture "fileId" Text
         :> Get '[HTML] File
       :<|>
+           -- This endpoint is for use by the web form used to update a file as
+           -- it responds with a redirect;
+           -- programmatic clients should use the below PUT endpoint
            Header "Host" Text
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PostNoContent
+      :<|>
+           Header "Host" Text
+        :> Capture "fileId" Text
+        :> MultipartForm Tmp (MultipartData Tmp)
+        :> PutNoContent
       )
   )
   :<|> "static" :> Raw
@@ -75,14 +83,15 @@ getFileHandler config _ mHost fileId =
         Right Nothing     -> throwError err404
         Right (Just file) -> pure $ File file
 
-putFileHandler
-  :: Config
+updateFileHandler
+  :: (URI -> Handler a)
+  -> Config
   -> User
   -> Maybe Text
   -> Text
   -> MultipartData Tmp
   -> Handler NoContent
-putFileHandler config user mHost fileId multipartData =
+updateFileHandler response config user mHost fileId multipartData =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "http://" <> host <> "/file/" <> fileId
@@ -99,9 +108,31 @@ putFileHandler config user mHost fileId multipartData =
           void $ case eitherRes of
             -- TODO: dispatch on AppError values to determine what error to throw.
             Left appError -> throwError (err400 { errBody = errToLBS appError })
-            Right _ -> throwError err303 { errHeaders = [("Location", encodeUtf8 . render $ fileUri)] }
+            Right _ -> response fileUri
           pure NoContent
         _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
+
+postFileHandler
+  :: Config
+  -> User
+  -> Maybe Text
+  -> Text
+  -> MultipartData Tmp
+  -> Handler NoContent
+postFileHandler =
+  let resp fileUri = throwError err303 { errHeaders = [("Location", encodeUtf8 . render $ fileUri)] }
+  in updateFileHandler resp
+
+putFileHandler
+  :: Config
+  -> User
+  -> Maybe Text
+  -> Text
+  -> MultipartData Tmp
+  -> Handler NoContent
+putFileHandler =
+  let resp = const $ pure NoContent
+  in updateFileHandler resp
 
 filesHandler
   :: Config
@@ -166,6 +197,11 @@ server :: Config -> Server FilesAPI
 server config = (\authedUser -> homeHandler config authedUser
                   :<|> filesHandler config authedUser
                   :<|> (getFileHandler config authedUser
+                        :<|>
+                        -- This handler is for use by the web form used to update a file as
+                        -- it responds with a redirect;
+                        -- PUTs from programmatic clients will use the below PUT handler
+                        postFileHandler config authedUser
                         :<|>
                         putFileHandler config authedUser))
                 :<|> staticHandler
