@@ -15,7 +15,7 @@ module RainbowHash.HSPARQL
 
 import           Protolude
 
-import Control.Monad.Logger (MonadLogger, logInfoN)
+import Control.Monad.Logger (MonadLogger, logDebugN)
 import           Data.UUID                (toText)
 import           Data.UUID.V4             (nextRandom)
 import qualified Text.Parsec.Error as P
@@ -386,7 +386,7 @@ updateFileGraphWithContent host fileUri blobUrl agentUri size time = do
   let pfd = PutFileData fileUri fileDataUri blobUrl agentUri size time
   renderPutFileTemplate pfd >>= logSparql >>= sparqlUpdate
   where logSparql :: MonadLogger m => Text -> m Text
-        logSparql t = logInfoN t >> pure t
+        logSparql t = logDebugN t >> pure t
 
 data PutFileData = PutFileData
   { fileUri :: URI
