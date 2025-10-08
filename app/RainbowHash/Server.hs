@@ -110,14 +110,9 @@ filesHandler
   -> MultipartData Tmp
   -> Handler NoContent
 filesHandler config user mHost multipartData = do
-  case files multipartData of
-    [fileData] ->
-      -- Use either the host provided by the user or the one provied in the Host
-      -- header with a preference for the user-specified one. If neither is
-      -- present, use defaultHost
-      let defaultHost = "example.com"
-          host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
-      in uploadFile host fileData (inputs multipartData)
+  case (files multipartData, mHost) of
+    ([fileData], Just host) -> uploadFile host fileData (inputs multipartData)
+    (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
