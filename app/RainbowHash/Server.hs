@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE FlexibleContexts     #-}
 
 module RainbowHash.Server (app) where
 
@@ -12,10 +13,11 @@ import qualified Data.ByteString.Lazy   as LBS
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
-import           Text.URI               (mkURI)
+import           Text.URI               (URI, mkURI, render)
 
 import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
+import qualified RainbowHash.App as App
 import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile)
@@ -30,10 +32,26 @@ type FilesAPI =
   (Get '[HTML] Home
     :<|> "files" :> Header "Host" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
-                 :> Post '[JSON] NoContent
-    :<|> "file"  :> Header "Host" Text
-                 :> Capture "fileId" Text
-                 :> Get '[HTML] File)
+                 :> PostNoContent
+    :<|> "file"  :>
+      (    Header "Host" Text
+        :> Capture "fileId" Text
+        :> Get '[HTML] File
+      :<|>
+           -- This endpoint is for use by the web form used to update a file as
+           -- it responds with a redirect;
+           -- programmatic clients should use the below PUT endpoint
+           Header "Host" Text
+        :> Capture "fileId" Text
+        :> MultipartForm Tmp (MultipartData Tmp)
+        :> PostNoContent
+      :<|>
+           Header "Host" Text
+        :> Capture "fileId" Text
+        :> MultipartForm Tmp (MultipartData Tmp)
+        :> PutNoContent
+      )
+  )
   :<|> "static" :> Raw
 
 api :: Proxy FilesAPI
@@ -50,8 +68,8 @@ homeHandler config user = do
     Left err          -> throwError $ err500 { errBody = errToLBS err }
     Right recentFiles -> pure $ Home user (File <$> recentFiles)
 
-fileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
-fileHandler config _ mHost fileId =
+getFileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
+getFileHandler config _ mHost fileId =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "http://" <> host <> "/file/" <> fileId
@@ -65,6 +83,57 @@ fileHandler config _ mHost fileId =
         Right Nothing     -> throwError err404
         Right (Just file) -> pure $ File file
 
+updateFileHandler
+  :: (URI -> Handler a)
+  -> Config
+  -> User
+  -> Maybe Text
+  -> Text
+  -> MultipartData Tmp
+  -> Handler NoContent
+updateFileHandler response config user mHost fileId multipartData =
+  let defaultHost = "example.com"
+      host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
+      uriText = "http://" <> host <> "/file/" <> fileId
+  in case mkURI uriText of
+    Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
+    Just fileUri -> do
+      liftIO $ writeLog LevelInfo $ "PUT file: " <> uriText
+      case files multipartData of
+        [fileData] -> do
+          let filePath = fdPayload fileData
+              mMediaType :: Maybe MediaType
+              mMediaType = Nothing
+          eitherRes <- liftIO $ runApp (App.updateFileContent host fileUri filePath (userWebId user) mMediaType) config
+          void $ case eitherRes of
+            -- TODO: dispatch on AppError values to determine what error to throw.
+            Left appError -> throwError (err400 { errBody = errToLBS appError })
+            Right _ -> response fileUri
+          pure NoContent
+        _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
+
+postFileHandler
+  :: Config
+  -> User
+  -> Maybe Text
+  -> Text
+  -> MultipartData Tmp
+  -> Handler NoContent
+postFileHandler =
+  let resp fileUri = throwError err303 { errHeaders = [("Location", encodeUtf8 . render $ fileUri)] }
+  in updateFileHandler resp
+
+putFileHandler
+  :: Config
+  -> User
+  -> Maybe Text
+  -> Text
+  -> MultipartData Tmp
+  -> Handler NoContent
+putFileHandler =
+  let resp = const $ pure NoContent
+  in updateFileHandler resp
+
 filesHandler
   :: Config
   -> User
@@ -72,14 +141,9 @@ filesHandler
   -> MultipartData Tmp
   -> Handler NoContent
 filesHandler config user mHost multipartData = do
-  case files multipartData of
-    [fileData] ->
-      -- Use either the host provided by the user or the one provied in the Host
-      -- header with a preference for the user-specified one. If neither is
-      -- present, use defaultHost
-      let defaultHost = "example.com"
-          host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
-      in uploadFile host fileData (inputs multipartData)
+  case (files multipartData, mHost) of
+    ([fileData], Just host) -> uploadFile host fileData (inputs multipartData)
+    (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
@@ -130,7 +194,17 @@ staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
 server :: Config -> Server FilesAPI
-server config = (\authedUser -> homeHandler config authedUser :<|> filesHandler config authedUser :<|> fileHandler config authedUser) :<|> staticHandler
+server config = (\authedUser -> homeHandler config authedUser
+                  :<|> filesHandler config authedUser
+                  :<|> (getFileHandler config authedUser
+                        :<|>
+                        -- This handler is for use by the web form used to update a file as
+                        -- it responds with a redirect;
+                        -- PUTs from programmatic clients will use the below PUT handler
+                        postFileHandler config authedUser
+                        :<|>
+                        putFileHandler config authedUser))
+                :<|> staticHandler
 
 app :: Config -> Application
 app config = serveWithContext api genAuthServerContext (server config)

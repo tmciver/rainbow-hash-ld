@@ -1,0 +1,29 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX fo: <http://timmciver.com/file-ontology#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+DELETE
+{ <{{fileUri}}> fo:fileData ?oldFileDataUri ;
+                fo:size ?oldFileSize ;
+                dct:modified ?oldModified .
+}
+INSERT
+{
+  <{{fileDataUri}}> a fo:FileData ;
+                    fo:contentUrl <{{fileContentUrl}}> ;
+                    fo:size "{{size}}"^^xsd:integer ;
+                    dct:created "{{creationTime}}"^^xsd:dateTime ;
+                    fo:previousRevision ?oldFileDataUri .
+
+  <{{fileUri}}> fo:fileData <{{fileDataUri}}> ;
+                fo:size "{{size}}"^^xsd:integer ;
+                dct:modified "{{creationTime}}"^^xsd:dateTime .
+}
+WHERE
+{
+  <{{fileUri}}> fo:fileData ?oldFileDataUri ;
+                fo:size ?oldFileSize ;
+                dct:modified ?oldModified .
+}

@@ -9,10 +9,13 @@ module RainbowHash.App
   , AppError(..)
   , runApp
   , appErrorToString
+  , updateFileContent
   ) where
 
 import           Protolude
 
+import           Text.URI             (URI)
+import           Network.HTTP.Media   (MediaType)
 import           Control.Monad.Catch           (MonadCatch, MonadMask,
                                                 MonadThrow)
 import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
@@ -30,16 +33,21 @@ import           RainbowHash.HTTPClient        as HTTPClient (HTTPClientError,
                                                               mapError,
                                                               postToSPARQL,
                                                               putFile)
-import           RainbowHash.LinkedData
+import           RainbowHash.LinkedData hiding (updateFileContent)
+import qualified RainbowHash.LinkedData as LD
 import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
 import           RainbowHash.RDF4H             (fileDataToRDF)
 
-newtype AppError = HTTPClientError HTTPClientError
-  deriving (Show)
+data AppError
+  = HTTPClientError HTTPClientError
+  | SparqlError HSPARQL.SparqlError
+  | FileError FileError
 
 appErrorToString :: AppError -> Text
 appErrorToString (HTTPClientError hce) = httpClientErrorToString hce
+appErrorToString (SparqlError sparqlError) = HSPARQL.sparqlErrorToText sparqlError
+appErrorToString (FileError fileError) = fileErrorToText fileError
 
 newtype AppM a = AppM (ExceptT AppError (ReaderT Config IO) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadError AppError, MonadMask, MonadCatch, MonadThrow)
@@ -71,6 +79,9 @@ instance MetadataPut AppM where
 
     pure url
 
+  updateFileGraphWithContent host fileUri blobUrl agentUri size time =
+    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri size time
+
 instance MediaTypeDiscover AppM FilePath where
   getMediaType = liftIO . discoverMediaTypeFP
 
@@ -85,3 +96,16 @@ instance Time AppM where
 
 instance MonadLogger AppM where
   monadLoggerLog _ _ logLevel = liftIO . writeLog logLevel . decodeUtf8 . fromLogStr . toLogStr
+
+updateFileContent
+  :: Text -- ^Hostname from HTTP request
+  -> URI -- ^URI of File object to be updated
+  -> FilePath   -- ^File content
+  -> URI -- ^URI of agent putting the file
+  -> Maybe MediaType
+  -> AppM ()
+updateFileContent host fileUri filePath createdByUri maybeMT = do
+  eitherRes <- LD.updateFileContent host fileUri filePath createdByUri maybeMT
+  case eitherRes of
+    Left err -> throwError $ FileError err
+    Right _ -> pure ()

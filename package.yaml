@@ -71,7 +71,9 @@ executable:
     - modern-uri
     - monad-logger
     - mtl
+    - mustache
     - optparse-applicative
+    - parsec
     - rainbow-hash
     - rainbow-hash-ld
     - random

@@ -1,7 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module RainbowHash.LinkedData
   ( putFile
+  , updateFileContent
   , FilePut(..)
   , FileGet(..)
   , MetadataPut(..)
@@ -10,6 +12,8 @@ module RainbowHash.LinkedData
   , FileSizeGet(..)
   , Time(..)
   , FileNodeCreateOption(..)
+  , FileError(..)
+  , fileErrorToText
   ) where
 
 import           Protolude
@@ -20,16 +24,24 @@ import           Data.Time.Clock      (UTCTime)
 import           Network.HTTP.Media   (MediaType, renderHeader)
 import           Text.URI             (URI, render)
 
-import           RainbowHash.File     (File)
+import           RainbowHash.File     (File, fileMediaType, fileContent)
 
 data FileNodeCreateOption
   = AlwaysCreate
-  -- ^Creates a new FileDataObject (NEPOMUK) even if one already exists for this
+  -- ^Creates a new File object even if one already exists for this
   -- content.
   | CreateIfNotExists
-  -- ^Only creates a new FileDataObject if one does not exist for this
-  -- content. Returns the URI for the existing FileDataObject otherwise.
+  -- ^Only creates a new File object if one does not exist for this
+  -- content. Returns the URI for the existing File object otherwise.
   deriving (Show)
+
+data FileError
+  = FileNotFound URI
+  | MediaTypeMismatch
+
+fileErrorToText :: FileError -> Text
+fileErrorToText (FileNotFound uri) = "File URI <" <> render uri <> "> not found."
+fileErrorToText MediaTypeMismatch = "Media type of new file content does not match existing content."
 
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
@@ -51,6 +63,15 @@ class Monad m => MetadataPut m where
     -> UTCTime -- ^file creation time
     -> MediaType
     -> m URI
+
+  updateFileGraphWithContent
+    :: Text -- ^Hostname from HTTP request
+    -> URI -- ^File object URI
+    -> URI -- ^URI of file data in blob storage
+    -> URI -- ^URI of agent creating the file
+    -> Integer    -- ^file size
+    -> UTCTime -- ^file creation time
+    -> m ()
 
 class Monad m => MediaTypeDiscover m v where
   getMediaType :: v -> m MediaType
@@ -128,6 +149,60 @@ putFile v host createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeC
           logInfoN "No file object exists for this content; creating a new file object."
           putFileMetadata host blobUrl createdByUri maybeFileName' size maybeTitle maybeDesc t mt
           >>= logPutFile blobUrl t mt
+
+updateFileContent
+  :: ( FileGet m
+     , FilePut m v
+     , MetadataPut m
+     , MediaTypeDiscover m v
+     , FileNameGet m v
+     , FileSizeGet m v
+     , Time m
+     , MonadLogger m
+     )
+  => Text -- ^Hostname from HTTP request
+  -> URI -- ^URI of File object to be updated
+  -> v   -- ^File content
+  -> URI -- ^URI of agent putting the file
+  -> Maybe MediaType
+  -> m (Either FileError ())
+updateFileContent host fileUri v createdByUri maybeMT = do
+  logInfoN $ "Updating file " <> render fileUri
+
+  -- Get the file object for the given fle URI
+  eitherFile <- getFile fileUri <&> maybe (Left $ FileNotFound fileUri) Right
+
+  case eitherFile of
+    Left err -> pure $ Left err
+    Right file -> do
+
+      -- Get the current time
+      t <- getCurrentTime
+
+      -- Use given media type or discover what it is.
+      mt <- maybe (getMediaType v) pure maybeMT
+
+      -- media type of new content must be the same as the existing content
+      if mt /= fileMediaType file
+        then pure $ Left MediaTypeMismatch
+        else do
+
+          logInfoN $ "Media type: " <> show mt
+
+          -- Get the file's size
+          size <- getFileSize v
+
+          -- Add file to blob store.
+          blobUrl <- putFileInStore v
+
+          -- Check to see if the new content is the same as the existing content.
+          -- If so, nothing will be done.
+          if blobUrl /= fileContent file
+            then do
+              logInfoN $ "Added file to store at URL " <> render blobUrl
+              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri size t
+            else
+              Right <$> (logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged")
 
 -- Logs the data used to create a file object.
 -- Takes the file URI argument last and returns it to facilitate monadic

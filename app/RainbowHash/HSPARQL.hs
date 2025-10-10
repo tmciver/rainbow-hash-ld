@@ -1,17 +1,32 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 
 module RainbowHash.HSPARQL
   ( getRecentFiles
   , getFileForContent
   , getFile
+  , updateFileGraphWithContent
+  , SparqlError(..)
+  , sparqlErrorToText
   ) where
 
 import           Protolude
 
+import Control.Monad.Logger (MonadLogger, logDebugN)
+import           Data.UUID                (toText)
+import           Data.UUID.V4             (nextRandom)
+import qualified Text.Parsec.Error as P
+import qualified Data.Text                             as T
+import qualified Data.Text.Encoding                    as T
+import qualified Data.ByteString.Lazy                  as LBS
+import           Network.HTTP.Client                   (Request, RequestBody(RequestBodyBS), Response, requestHeaders, requestBody, defaultManagerSettings, newManager, httpLbs, responseStatus, responseBody, parseRequest)
+import           Network.HTTP.Types                    (Status, statusIsSuccessful)
 import           Control.Monad.Logger            (LogLevel (LevelDebug, LevelError))
 import           Data.RDF                        (LValue (..), Node (..))
 import           Data.Text                       (pack, unpack)
-import qualified Data.Text.Encoding              as T
 import           Data.Time                       (UTCTime)
 import           Data.Time.Format.ISO8601        (iso8601ParseM)
 import           Database.HSparql.Connection     (BindingValue (..),
@@ -19,6 +34,9 @@ import           Database.HSparql.Connection     (BindingValue (..),
 import           Database.HSparql.QueryGenerator
 import           Network.HTTP.Media              (MediaType, parseAccept)
 import           Numeric.Natural                 (Natural)
+import Text.Mustache (ToMustache(..), object, (~>), (~=), automaticCompile, checkedSubstitute)
+import Text.Mustache.Render (SubstitutionError)
+import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
 import           RainbowHash.File                (File (..))
@@ -339,3 +357,150 @@ getFileSize
   => BindingValue
   -> m Integer
 getFileSize = parseUnboundAsError parseFileSizeNode
+
+mkURI'
+  :: MonadError SparqlError m
+  => Text
+  -> m URI
+mkURI' t = maybe (throwError $ MalformedURI t) pure (mkURI t)
+
+updateFileGraphWithContent
+    :: ( MonadIO m
+       , MonadReader env m
+       , HasField "sparqlEndpoint" env URI
+       , MonadError SparqlError m
+       , MonadLogger m
+       )
+    => Text -- ^host name
+    -> URI -- ^File object URI
+    -> URI -- ^URI of file data in blob storage
+    -> URI -- ^URI of agent creating the file
+    -> Integer    -- ^file size
+    -> UTCTime -- ^file creation time
+    -> m ()
+updateFileGraphWithContent host fileUri blobUrl agentUri size time = do
+  let baseUrlText = "http://" <> host
+  fileDataId <- liftIO nextRandom
+  fileDataUri <- mkURI' $ baseUrlText <> "/file-data/" <> toText fileDataId
+
+  let pfd = PutFileData fileUri fileDataUri blobUrl agentUri size time
+  renderPutFileTemplate pfd >>= logSparql >>= sparqlUpdate
+  where logSparql :: MonadLogger m => Text -> m Text
+        logSparql t = logDebugN t >> pure t
+
+data PutFileData = PutFileData
+  { fileUri :: URI
+  , fileDataUri :: URI
+  , fileContentUrl :: URI
+  , agentUri :: URI
+  , fileSize :: Integer
+  , creationTime :: UTCTime
+  }
+
+instance ToMustache PutFileData where
+  toMustache PutFileData{..} = object
+    [ "fileUri" ~> render fileUri
+    , "fileDataUri" ~> render fileDataUri
+    , "fileContentUrl" ~> render fileContentUrl
+    , "agentUri" ~> render agentUri
+    , "size" ~> fileSize
+    , "creationTime" ~= creationTime
+    ]
+
+data SparqlError
+  = TemplateCompileError ParseError
+  | TemplateSubstitueError [SubstitutionError]
+  | SparqlResponseError Status Text
+  | SparqlRequestError Text
+  | MalformedURI Text
+
+sparqlErrorToText :: SparqlError -> Text
+sparqlErrorToText (TemplateCompileError pe) =
+  let errMsg = pe & P.errorMessages
+                 <&> T.pack . P.messageString
+                  & T.intercalate ", "
+  in "SPARQL template compile error: " <> errMsg
+sparqlErrorToText (TemplateSubstitueError ses) =
+  let errMsg = ses <&> show
+                    & T.intercalate ", "
+  in "SPARQL template substitution error: " <> errMsg
+sparqlErrorToText (SparqlResponseError status  msg) =
+  "SPARQL response error: status: " <> show status <> ", error message: " <> msg
+sparqlErrorToText (SparqlRequestError msg) =
+  "SPARQL request error: " <> msg
+sparqlErrorToText (MalformedURI t) = "Malformed URI: " <> t
+
+renderPutFileTemplate
+  :: ( MonadIO m
+     , MonadError SparqlError m
+     )
+  => PutFileData
+  -> m Text
+renderPutFileTemplate putFileData = do
+  let searchSpace = ["./template"]
+      templateName = "put-file.template"
+
+  compiled <- liftIO $ automaticCompile searchSpace templateName
+  case compiled of
+    Left err -> throwError $ TemplateCompileError err --writeLog LevelError $ "Error rendering Mustache template: " <> show err
+    Right template ->
+      case checkedSubstitute template putFileData of
+        ([], t) -> putStrLn t >> pure t
+        (errs, _) -> throwError $ TemplateSubstitueError errs
+
+sparqlUpdate
+  :: ( MonadIO m
+     , MonadReader env m
+     , HasField "sparqlEndpoint" env URI
+     , MonadError SparqlError m
+     )
+  => -- URI -- ^SPARQL endpoint
+  Text -- ^SPARQL update payload as text
+  -> m ()
+sparqlUpdate payload = do
+  mgr <- liftIO $ newManager defaultManagerSettings
+  req <- mkRequest payload
+  (liftIO $ httpLbs req mgr) >>= responseToError
+
+checkStatusWithTextMessage
+  :: MonadError SparqlError m
+  => (a -> Text)
+  -> Response a
+  -> m ()
+checkStatusWithTextMessage toText' resp = do
+  let status = responseStatus resp
+  unless (statusIsSuccessful status) $
+    let msg = T.take 100 . toText' . responseBody $ resp
+    in throwError $ SparqlResponseError status msg
+
+responseToError
+  :: ( MonadError SparqlError m )
+  => Response LBS.ByteString
+  -> m ()
+responseToError = checkStatusWithTextMessage (T.take 100 . T.decodeUtf8 . LBS.toStrict)
+
+mkRequest
+  :: ( MonadError SparqlError m
+     , MonadIO m
+     , MonadReader env m
+     , HasField "sparqlEndpoint" env URI
+     )
+  => Text
+  -> m Request
+mkRequest t = do
+  config <- ask
+  let sparqlEndpoint' = getField @"sparqlEndpoint" config
+
+  -- initialize the Request object
+  let reqText = "POST " <> T.unpack (render sparqlEndpoint') <> "/update"
+
+  req <- case parseRequest reqText of
+           Just r -> pure r
+           Nothing -> throwError $ SparqlRequestError $ "Could not create Request from text \"" <> T.pack reqText <> "\""
+
+  -- update the headers
+  let req' = req { requestHeaders = ("Content-Type", "application/sparql-update") : requestHeaders req
+                 , requestBody = RequestBodyBS $ T.encodeUtf8 t
+                 }
+
+  pure req'
