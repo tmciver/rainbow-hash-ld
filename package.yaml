@@ -89,3 +89,36 @@ executables:
       - uuid
       - wai
       - warp
+
+  rhld:
+    main:                Main.hs
+    source-dirs:
+    - cli
+    - cli/src
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wall
+    dependencies:
+    - rainbow-hash
+    - protolude
+    - aeson
+    - bytestring
+    - containers
+    - data-default
+    - directory
+    - exceptions
+    - filepath
+    - fsnotify
+    - http-client
+    - http-types
+    - lens
+    - modern-uri
+    - monad-logger
+    - optparse-applicative
+    - ordered-containers
+    - text
+    - wreq
+    - yaml
+
