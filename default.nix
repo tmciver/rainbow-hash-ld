@@ -15,8 +15,8 @@ pkgs.haskellPackages.developPackage {
     rainbow-hash = pkgs.fetchFromGitHub {
       owner = "tmciver";
       repo = "rainbow-hash";
-      rev = "6b5dd642332f71256a80fa2abca222272c204d32";
-      hash = "sha256-b+n4HIj+RdCB8FlfGn8cNogNMoXbCE81D8my7kuyeY0=";
+      rev = "7fa2f433066d237c9ee2a949d5743fd8d774aa3e";
+      hash = "sha256-0YmUAKH/2n5+NVpkueqBrMfo46Pj3/0gGmbGhIGYqjA=";
     };
     crypton-pem = pkgs.fetchFromGitHub {
       owner = "mpilgrem";
