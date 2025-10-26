@@ -33,58 +33,59 @@ library:
     - protolude
     - transformers
 
-executable:
-  main: Main.hs
-  source-dirs: app
-  other-modules:
-    - RainbowHash.App
-    - RainbowHash.Config
-    - RainbowHash.Crypto
-    - RainbowHash.HSPARQL
-    - RainbowHash.HTTPClient
-    - RainbowHash.MediaTypeDiscover
-    - RainbowHash.Options
-    - RainbowHash.Profile
-    - RainbowHash.WebID
-    - RainbowHash.RDF4H
-    - RainbowHash.Servant
-    - RainbowHash.Server
-    - RainbowHash.User
-    - RainbowHash.View.File
-    - RainbowHash.View.HTML
-    - RainbowHash.View.Home
-  dependencies:
-    - bytestring
-    - case-insensitive
-    - containers
-    - crypton
-    - crypton-x509
-    - crypton-pem
-    - exceptions
-    - filepath
-    - hsparql
-    - http-client
-    - http-media
-    - http-types
-    - lucid
-    - magic
-    - modern-uri
-    - monad-logger
-    - mtl
-    - mustache
-    - optparse-applicative
-    - parsec
-    - rainbow-hash
-    - rainbow-hash-ld
-    - random
-    - rdf4h
-    - servant
-    - servant-client
-    - servant-multipart
-    - servant-multipart-client
-    - servant-server
-    - temporary
-    - transformers
-    - uuid
-    - wai
-    - warp
+executables:
+  rhld-server:
+    main: Main.hs
+    source-dirs: server
+    other-modules:
+      - RainbowHash.App
+      - RainbowHash.Config
+      - RainbowHash.Crypto
+      - RainbowHash.HSPARQL
+      - RainbowHash.HTTPClient
+      - RainbowHash.MediaTypeDiscover
+      - RainbowHash.Options
+      - RainbowHash.Profile
+      - RainbowHash.WebID
+      - RainbowHash.RDF4H
+      - RainbowHash.Servant
+      - RainbowHash.Server
+      - RainbowHash.User
+      - RainbowHash.View.File
+      - RainbowHash.View.HTML
+      - RainbowHash.View.Home
+    dependencies:
+      - bytestring
+      - case-insensitive
+      - containers
+      - crypton
+      - crypton-x509
+      - crypton-pem
+      - exceptions
+      - filepath
+      - hsparql
+      - http-client
+      - http-media
+      - http-types
+      - lucid
+      - magic
+      - modern-uri
+      - monad-logger
+      - mtl
+      - mustache
+      - optparse-applicative
+      - parsec
+      - rainbow-hash
+      - rainbow-hash-ld
+      - random
+      - rdf4h
+      - servant
+      - servant-client
+      - servant-multipart
+      - servant-multipart-client
+      - servant-server
+      - temporary
+      - transformers
+      - uuid
+      - wai
+      - warp
