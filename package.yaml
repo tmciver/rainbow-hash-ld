@@ -119,6 +119,7 @@ executables:
     - optparse-applicative
     - ordered-containers
     - text
+    - unix
     - wreq
     - yaml
 

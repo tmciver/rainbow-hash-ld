@@ -10,6 +10,8 @@ module RainbowHash.App
 
 import Protolude
 
+import System.Posix.Files (getFileStatus, fileOwner)
+import System.Posix.User (getUserEntryForID, userName)
 import Control.Monad.Logger (MonadLogger(..), toLogStr, fromLogStr, logInfoN, logErrorN)
 import qualified Data.Set.Ordered as OSet
 import qualified Data.Text as T
@@ -67,6 +69,13 @@ hashToUrl h = do
   host <- asks serverUri
   mkURI $ render host <> "/blob/" <> h
 
+getFileOwnerUsername :: FilePath -> IO Text
+getFileOwnerUsername path = do
+  status <- getFileStatus path
+  let ownerId = fileOwner status
+  userEntry <- getUserEntryForID ownerId
+  return . T.pack . userName $ userEntry
+
 instance HttpRead App where
   doesFileExistInStore h = do
     fileUrl <- hashToUrl h
@@ -82,6 +91,7 @@ instance FileSystemRead App where
   readFile = liftIO . BS.readFile
   listDirectory = (OSet.fromList <$>) . liftIO . Dir.listDirectory
   doesFileExist = liftIO . Dir.doesFileExist
+  getFileOwner = liftIO . getFileOwnerUsername
 
 instance FileSystemWrite App where
   createDirectory = liftIO . Dir.createDirectoryIfMissing True
