@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -23,7 +24,7 @@ import Protolude hiding (readFile)
 import qualified Data.Map as Map
 import Data.Set.Ordered (OSet)
 import qualified Data.Set.Ordered as OSet
-import Control.Monad.Logger (MonadLogger, logInfoN)
+import Control.Monad.Logger (MonadLogger, logInfoN, logErrorN)
 
 import RainbowHash (calcHash, Hash)
 import System.FilePath ((</>), takeDirectory)
@@ -166,9 +167,12 @@ putFileMoveOnError
 putFileMoveOnError filePath = do
   let dir = takeDirectory filePath
       errorDir = dir </> "upload-errors"
-  putFile filePath `catchError` (\(PostError _) -> do
-                                    createDirectory errorDir
-                                    moveToDirectory filePath errorDir)
+  putFile filePath `catchError` (\case
+                                    (PostError _) -> do
+                                      createDirectory errorDir
+                                      moveToDirectory filePath errorDir
+                                    e -> logErrorN $ "Got an unexpected error: " <> show e
+                                )
 
 uploadDirectoryMoveOnError
   :: ( FileSystemRead m
