@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -10,7 +11,7 @@ module RainbowHash.CLI
   , FileSystemRead(..)
   , FileSystemWrite(..)
   , DirectoryWatch(..)
-  , HttpError(..)
+  , AppError(..)
   , putFile
   , putFileMoveOnError
   , watchDirectoryMoveOnError
@@ -26,13 +27,16 @@ import Control.Monad.Logger (MonadLogger, logInfoN)
 import RainbowHash (calcHash, Hash)
 import System.FilePath ((</>), takeDirectory)
 import RainbowHash.CLI.Config (DeleteAction(..))
+import RainbowHash.EmailAddress (EmailAddress)
 import qualified Data.Text as T
 
-newtype HttpError = PostError Text
+data AppError
+  = EmailNotFound Text
+  | PostError Text
   deriving (Eq, Show)
 
-class MonadError HttpError m => HttpWrite m where
-  postFile :: FilePath -> m ()
+class MonadError AppError m => HttpWrite m where
+  postFile :: FilePath -> EmailAddress -> m ()
 
 class HttpRead m where
   doesFileExistInStore :: Hash -> m Bool
@@ -41,6 +45,7 @@ class Monad m => FileSystemRead m where
   readFile :: FilePath -> m ByteString
   listDirectory :: FilePath -> m (OSet FilePath)
   doesFileExist :: FilePath -> m Bool
+  getFileOwner :: FilePath -> m Text -- Can this fail?
 
 class Monad m => FileSystemWrite m where
   createDirectory :: FilePath -> m ()
@@ -64,6 +69,7 @@ watchDirectoryMoveOnError
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
+     , HasField "emailMap" env (Map Text EmailAddress)
      , MonadReader env m
      , MonadLogger m
      )
@@ -82,6 +88,25 @@ shouldBeIgnored fp = do
   exts <- asks (getField @"extensionsToIgnore")
   pure $ any (`T.isSuffixOf` T.pack fp) exts
 
+getUserEmail
+  :: ( HasField "emailMap" env (Map Text EmailAddress)
+     , MonadReader env m
+     )
+  => Text -- ^username
+  -> m (Maybe EmailAddress)
+getUserEmail = undefined
+
+fromJustM
+  :: Monad m
+  => m (Maybe a)
+  -> m a
+  -> m a
+fromJustM mm onNothing = do
+  mx <- mm
+  case mx of
+    Nothing -> onNothing
+    Just x -> pure x
+
 putFile
   :: ( FileSystemRead m
      , FileSystemWrite m
@@ -89,34 +114,38 @@ putFile
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
+     , HasField "emailMap" env (Map Text EmailAddress)
      , MonadReader env m
      , MonadLogger m
      )
   => FilePath -- ^the file to upload
   -> m ()
-putFile fp = do
+putFile filePath = do
   logInfoN ""
-  logInfoN $ "Attempting to Upload file " <> T.pack fp
+  logInfoN $ "Attempting to Upload file " <> T.pack filePath
 
   -- Check if this file should be ignored.
-  shouldBeIgnored' <- shouldBeIgnored fp
+  shouldBeIgnored' <- shouldBeIgnored filePath
   if shouldBeIgnored'
-    then logInfoN $ "Ignoring " <> T.pack fp
+    then logInfoN $ "Ignoring " <> T.pack filePath
     else  do
       -- Calculate the hash of the file's content.
-      bs <- readFile fp
+      bs <- readFile filePath
       let hash' = calcHash bs
 
       -- Only upload the file if it doesn't exist on the server.
       fileExists <- doesFileExistInStore hash'
       if fileExists
         then logInfoN ("File exists on server; not uploading." :: Text)
-        else postFile fp
+        else do
+          username <- getFileOwner filePath
+          userEmail <- fromJustM (getUserEmail username) (throwError $ EmailNotFound username)
+          postFile filePath userEmail
 
       -- Delete the local file if configured.
       deleteAction <- asks (getField @"deleteAction")
       case deleteAction of
-        Delete -> deleteFile fp
+        Delete -> deleteFile filePath
         NoDelete -> pure ()
 
 putFileMoveOnError
@@ -126,18 +155,19 @@ putFileMoveOnError
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
+     , HasField "emailMap" env (Map Text EmailAddress)
      , MonadReader env m
      , MonadLogger m
      )
-  => --FilePath -- ^Directory to move file to on error ->
-  FilePath -- ^Path to file to upload
+  => FilePath -- ^Directory to move file to on error ->
+  --SystemFile -- ^file to upload
   -> m ()
-putFileMoveOnError fp = do
-  let dir = takeDirectory fp
+putFileMoveOnError filePath = do
+  let dir = takeDirectory filePath
       errorDir = dir </> "upload-errors"
-  putFile fp `catchError` (\(PostError _) -> do
-                              createDirectory errorDir
-                              moveToDirectory fp errorDir)
+  putFile filePath `catchError` (\(PostError _) -> do
+                                    createDirectory errorDir
+                                    moveToDirectory filePath errorDir)
 
 uploadDirectoryMoveOnError
   :: ( FileSystemRead m
@@ -146,6 +176,7 @@ uploadDirectoryMoveOnError
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
+     , HasField "emailMap" env (Map Text EmailAddress)
      , MonadReader env m
      , MonadLogger m
      )

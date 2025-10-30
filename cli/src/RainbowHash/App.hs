@@ -28,18 +28,18 @@ import qualified Data.ByteString as BS
 
 import RainbowHash.CLI.Config (Config(..))
 import RainbowHash (Hash)
-import RainbowHash.CLI (HttpRead(..), HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), HttpError(..))
+import RainbowHash.CLI (HttpRead(..), HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
 import RainbowHash.Logger (writeLog)
 
-newtype App a = App { unApp :: ExceptT HttpError (ReaderT Config IO) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadThrow, MonadError HttpError)
+newtype App a = App { unApp :: ExceptT AppError (ReaderT Config IO) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadThrow, MonadError AppError)
 
-runApp :: App a -> Config -> IO (Either HttpError a)
+runApp :: App a -> Config -> IO (Either AppError a)
 runApp = runReaderT . runExceptT . unApp
 
 instance HttpWrite App where
-  postFile fp = do
-    url <- (<> "/blobs") . renderStr <$> asks serverUri
+  postFile fp emailAddress = do
+    url <- renderStr <$> asks serverUri
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
     let part = partFile "" fp
         opts = defaults & set checkResponse (Just $ \_ _ -> pure ()) -- I'm not sure if this is working: still get an exception if server is not up.

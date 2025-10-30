@@ -1,9 +1,12 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module RainbowHash.EmailAddress
   ( EmailAddress(..)
-  , getEmailAddress
   ) where
 
-import Data.Text (Text)
+import Protolude
+
+import Data.Aeson (FromJSON, ToJSON)
 
 newtype EmailAddress = EmailAddress { getEmailAddress :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, FromJSON, ToJSON)

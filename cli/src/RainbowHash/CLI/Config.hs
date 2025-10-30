@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -13,6 +14,7 @@ import Protolude
 import Data.Aeson (ToJSON (..), object, (.=), FromJSON (..), withObject, (.:), (.!=), (.:?))
 import GHC.Natural (Natural)
 import Text.URI (URI (..), mkURI, Authority (..), unRText)
+import qualified Data.Map as Map
 import Data.Maybe (fromJust)
 import qualified System.Directory as D
 import System.FilePath ((</>), takeDirectory)
@@ -22,6 +24,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Control.Monad.Logger (LogLevel(LevelInfo))
 
+import RainbowHash.EmailAddress (EmailAddress)
 import RainbowHash.Logger (writeLog)
 
 data DeleteAction
@@ -40,11 +43,12 @@ data Config = Config
   { serverUri :: URI
   , deleteAction :: DeleteAction
   , extensionsToIgnore :: Set Text
+  , emailMap :: Map Text EmailAddress
   }
 
 instance ToJSON Config where
-  toJSON (Config uri delete extensionsToIgnore') =
-    let authority = either (panic "Could not get host from config") identity . uriAuthority $ uri
+  toJSON Config {..} =
+    let authority = either (panic "Could not get host from config") identity . uriAuthority $ serverUri
         host = unRText . authHost $ authority
         port = fromJust . authPort $ authority
     in object
@@ -52,8 +56,9 @@ instance ToJSON Config where
          [ "host" .= host
          , "port" .= port
          ]
-       , "delete-uploaded-file" .= toBool delete
-       , "extensions-to-ignore" .= extensionsToIgnore'
+       , "delete-uploaded-file" .= toBool deleteAction
+       , "extensions-to-ignore" .= extensionsToIgnore
+       , "email-webid-map" .= toJSON emailMap
        ]
 
 instance FromJSON Config where
@@ -62,18 +67,21 @@ instance FromJSON Config where
     host <- server .: "host"
     port <- server .: "port"
     delete <- o .:? "delete-uploaded-file" .!= False
-    extensionsToIgnore' <- o .:? "extensions-to-ignore" .!= Set.empty
-    let uri = getURI host port
-    pure $ Config uri (fromBool delete) extensionsToIgnore'
+    extensionsToIgnore <- o .:? "extensions-to-ignore" .!= Set.empty
+    emailMap <- o .:? "email-webid-map" .!= Map.empty
+    let serverUri = getURI host port
+        deleteAction = fromBool delete
+    pure Config {..}
 
 instance Default Config where
   def = let host = "localhost"
             port :: Natural
             port = 3000
-            deleteAction' = NoDelete
-            extensionsToIgnore' = Set.empty
+            deleteAction = NoDelete
+            extensionsToIgnore = Set.empty
+            emailMap = Map.empty
         in case mkURI ("http://" <> host <> ":" <> show port) of
-             Just uri -> Config uri deleteAction' extensionsToIgnore'
+             Just serverUri -> Config {..}
              Nothing -> panic "Could not create a URI to the server."
 
 getURI :: Text -> Natural -> URI
@@ -81,7 +89,7 @@ getURI host port =
   fromJust $ mkURI ("http://" <> host <> ":" <> show port)
 
 getConfigFile :: IO FilePath
-getConfigFile = (</> "cli" </> "config.yaml") <$> D.getXdgDirectory D.XdgConfig "rainbowhash"
+getConfigFile = (</> "cli" </> "config.yaml") <$> D.getXdgDirectory D.XdgConfig "caldron"
 
 getConfig :: IO Config
 getConfig = do
