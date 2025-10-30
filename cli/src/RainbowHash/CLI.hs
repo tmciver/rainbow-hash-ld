@@ -20,6 +20,7 @@ module RainbowHash.CLI
 
 import Protolude hiding (readFile)
 
+import qualified Data.Map as Map
 import Data.Set.Ordered (OSet)
 import qualified Data.Set.Ordered as OSet
 import Control.Monad.Logger (MonadLogger, logInfoN)
@@ -94,7 +95,7 @@ getUserEmail
      )
   => Text -- ^username
   -> m (Maybe EmailAddress)
-getUserEmail = undefined
+getUserEmail username = Map.lookup username <$> asks (getField @"emailMap")
 
 fromJustM
   :: Monad m
