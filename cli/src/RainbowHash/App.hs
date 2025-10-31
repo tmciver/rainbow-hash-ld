@@ -17,7 +17,7 @@ import qualified Data.Set.Ordered as OSet
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Network.HTTP.Client.MultipartFormData (partFile)
-import Network.Wreq (defaults, manager, postWith, checkResponse, headWith)
+import Network.Wreq (defaults, manager, postWith, checkResponse, headWith, header)
 import Network.HTTP.Client (Response(responseStatus), ManagerSettings (managerResponseTimeout), defaultManagerSettings, responseTimeoutMicro)
 import Network.HTTP.Types (statusIsSuccessful)
 import Text.URI (renderStr, URI, mkURI, render)
@@ -31,6 +31,7 @@ import qualified Data.ByteString as BS
 import RainbowHash.CLI.Config (Config(..))
 import RainbowHash (Hash)
 import RainbowHash.CLI (HttpRead(..), HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
+import RainbowHash.EmailAddress (getEmailAddress)
 import RainbowHash.Logger (writeLog)
 
 newtype App a = App { unApp :: ExceptT AppError (ReaderT Config IO) a }
@@ -44,8 +45,13 @@ instance HttpWrite App where
     url <- renderStr <$> asks serverUri
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
     let part = partFile "" fp
+        emailBS = T.encodeUtf8 . getEmailAddress $ emailAddress
         opts = defaults & set checkResponse (Just $ \_ _ -> pure ()) -- I'm not sure if this is working: still get an exception if server is not up.
                         & manager .~ Left defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 } -- 60 seconds
+                        -- Send the email address associated with the owner of
+                        -- the file to the server which has a mapping of email
+                        -- address to WebID.
+                        & header "From" .~ [emailBS]
     eitherRes <- liftIO $ try $ postWith opts url part
     case eitherRes of
       Left (SomeException e) -> do
