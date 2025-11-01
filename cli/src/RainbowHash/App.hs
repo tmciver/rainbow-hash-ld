@@ -20,13 +20,23 @@ import Network.HTTP.Client.MultipartFormData (partFile)
 import Network.Wreq (defaults, manager, postWith, checkResponse, headWith, header)
 import Network.HTTP.Client (Response(responseStatus), ManagerSettings (managerResponseTimeout), defaultManagerSettings, responseTimeoutMicro)
 import Network.HTTP.Types (statusIsSuccessful)
-import Text.URI (renderStr, URI, mkURI, render)
+import Text.URI (renderStr, URI, mkURI, render, uriAuthority, authHost, unRText, uriPort)
 import Control.Lens (set, (.~))
 import Control.Monad.Catch (MonadThrow)
 import qualified System.Directory as Dir
 import System.FSNotify (Event(..), Action, EventIsDirectory(..), withManager, watchDir)
 import System.FilePath ((</>), takeFileName)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import           Data.Default.Class (def)
+import           Data.Maybe (fromMaybe)
+import           Data.X509 (CertificateChain(..))
+import qualified Data.X509 as X509
+import qualified Data.X509.File as X509File
+import           Data.X509.Validation (getSigned)
+import qualified Network.Connection as Conn
+import qualified Network.HTTP.Client.TLS as TLS
+import qualified Network.TLS as TLS
 
 import RainbowHash.CLI.Config (Config(..))
 import RainbowHash (Hash)
@@ -42,15 +52,56 @@ runApp = runReaderT . runExceptT . unApp
 
 instance HttpWrite App where
   postFile fp emailAddress = do
-    url <- renderStr <$> asks serverUri
+    config <- ask
+    let sUri = serverUri config
+        url = renderStr sUri
+
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
+
+    let
+      -- Assuming Config has fields `clientCertPath :: Maybe FilePath` and
+      -- `clientKeyPath :: Maybe FilePath`. These will need to be added to the
+      -- Config data type.
+      mCertConfig = (,) <$> clientCertPath config <*> clientKeyPath config
+      mAuth = uriAuthority sUri
+      mHostName = T.unpack . unRText . authHost <$> mAuth
+      mPort = BS8.pack . show <$> uriPort sUri
+
+    managerSettings <- case (mCertConfig, mHostName) of
+      (Just (certPath, keyPath), Just hostName) -> do
+        eCred <- liftIO . try $ do
+          certs <- X509File.readSignedObject certPath
+          let certChain = CertificateChain $ map (X509.signedObject . getSigned) certs
+          [privKey] <- X509File.readKeyFile keyPath -- Assumes one private key in file.
+          pure (certChain, privKey)
+
+        case eCred of
+          Left (e :: SomeException) -> do
+            logErrorN $ "Failed to load client certificate: " <> show e
+            pure $ defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 }
+          Right cred -> do
+            let clientParams = TLS.ClientParams
+                  { TLS.clientUseMaxFragmentLength = Nothing
+                  , TLS.clientServerIdentification = (hostName, fromMaybe "443" mPort)
+                  , TLS.clientUseServerNameIndication = True
+                  , TLS.clientWantSessionResume = Nothing
+                  , TLS.clientShared = def
+                  , TLS.clientHooks = def
+                  , TLS.clientSupported = def
+                  , TLS.clientDebug = def
+                  , TLS.clientUseCertificate = Just cred
+                  }
+                tlsSettings = Conn.TLSSettings clientParams
+                settings = TLS.mkManagerSettings tlsSettings Nothing
+            pure $ settings { managerResponseTimeout = responseTimeoutMicro 60000000 }
+      _ -> do
+        logInfoN "Client certificate not configured, proceeding without."
+        pure $ defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 }
+
     let part = partFile "" fp
         emailBS = T.encodeUtf8 . getEmailAddress $ emailAddress
-        opts = defaults & set checkResponse (Just $ \_ _ -> pure ()) -- I'm not sure if this is working: still get an exception if server is not up.
-                        & manager .~ Left defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 } -- 60 seconds
-                        -- Send the email address associated with the owner of
-                        -- the file to the server which has a mapping of email
-                        -- address to WebID.
+        opts = defaults & set checkResponse (Just $ \_ _ -> pure ())
+                        & manager .~ Left managerSettings
                         & header "From" .~ [emailBS]
     eitherRes <- liftIO $ try $ postWith opts url part
     case eitherRes of
