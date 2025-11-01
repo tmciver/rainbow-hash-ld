@@ -77,8 +77,9 @@ instance HttpWrite App where
 
         case eCred of
           Left (e :: SomeException) -> do
-            logErrorN $ "Failed to load client certificate: " <> show e
-            pure $ defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 }
+            let errMsg = "Failed to load client certificate: " <> show e
+            logErrorN errMsg
+            throwError $ PostError errMsg
           Right cred -> do
             let clientParams = TLS.ClientParams
                   { TLS.clientUseMaxFragmentLength = Nothing
@@ -94,8 +95,9 @@ instance HttpWrite App where
                 tlsSettings = Conn.TLSSettings clientParams
                 settings = TLS.mkManagerSettings tlsSettings Nothing
             pure $ settings { managerResponseTimeout = responseTimeoutMicro 60000000 }
-      _ -> do
-        logInfoN "Client certificate not configured, proceeding without."
+      (Nothing, _) -> throwError $ PostError "Client certificate and/or key path not configured."
+      (Just _, Nothing) -> do
+        logInfoN "Could not determine hostname from server URI, proceeding without client certificate."
         pure $ defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 }
 
     let part = partFile "" fp
