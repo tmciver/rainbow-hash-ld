@@ -11,13 +11,13 @@ module RainbowHash.Command
 
 import Protolude
 
-import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM)
+import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM, strOption)
 import Text.URI (URI)
 import qualified Text.URI as URI
 import qualified Data.Text as T
 
 import RainbowHash.CLI (putFileMoveOnError, watchDirectoryMoveOnError, uploadDirectoryMoveOnError)
-import RainbowHash.CLI.Config (Config (..), fromBool)
+import RainbowHash.CLI.Config (StoredConfig (..), Config (..), fromBool, DeleteAction (..))
 import RainbowHash.App (runApp)
 import System.Directory (doesDirectoryExist)
 
@@ -32,6 +32,8 @@ data Command
 data CommonOptions = CommonOptions
   { coDeleteAfterUpload :: Maybe Bool
   , coServerUri :: Maybe URI
+  , coCertPath :: Maybe FilePath
+  , coKeyPath :: Maybe FilePath
   } deriving (Show)
 
 data WatchDirOptions = WatchDirOptions
@@ -62,6 +64,8 @@ commonOptionsParser :: Parser CommonOptions
 commonOptionsParser = CommonOptions
   <$> deleteParser
   <*> optional (option uriReader (long "server-uri" <> help "The URI of the rainbow-hash server."))
+  <*> optional (strOption (long "cert-path" <> help "Path to the X509 certificate file."))
+  <*> optional (strOption (long "key-path" <> help "Path to the X509 key file."))
 
 watchCommand :: Parser Command
 watchCommand = WatchDir <$>
@@ -88,28 +92,47 @@ options = info commandParser
  <> header "A header for the CLI for rainbow-hash."
   )
 
+getCommonOptions :: Command -> CommonOptions
+getCommonOptions (WatchDir (WatchDirOptions _ common)) = common
+getCommonOptions (Upload (UploadOptions _ common)) = common
+
+mkConfig
+  :: Command
+  -> StoredConfig
+  -> Either Text Config
+mkConfig cmd StoredConfig{..} = do
+  let CommonOptions{..} = getCommonOptions cmd
+  serverUri <- case coServerUri <|> scServerUri of
+    Just u -> Right u
+    Nothing -> Left "Server URI is not specified."
+  certPath <- case coCertPath <|> scCertPath of
+    Just p -> Right p
+    Nothing -> Left "Certificate path is not specified."
+  keyPath <- case coKeyPath <|> scKeyPath of
+    Just p -> Right p
+    Nothing -> Left "Key path is not specified."
+  let deleteAction = maybe scDeleteAction fromBool coDeleteAfterUpload
+      extensionsToIgnore = scExtensionsToIgnore
+      emailMap = scEmailMap
+  pure Config {..}
+
 runCommand
-  :: Config
+  :: StoredConfig
   -> Command
   -> IO ()
-runCommand config cmd = do
-  eitherRes <- case cmd of
-        WatchDir (WatchDirOptions dir commonOpts) -> do
-          let config' = applyCommonOptions commonOpts config
-          runApp (watchDirectoryMoveOnError dir) config'
+runCommand storedConfig cmd =
+  case mkConfig cmd storedConfig of
+    Left err -> print err
+    Right config -> do
+      eitherRes <- case cmd of
+            WatchDir (WatchDirOptions dir _) ->
+              runApp (watchDirectoryMoveOnError dir) config
 
-        Upload (UploadOptions fileOrDirectory' commonOpts) -> do
-          isDir <- doesDirectoryExist fileOrDirectory'
-          let config' = applyCommonOptions commonOpts config
-              app = if isDir
-                then uploadDirectoryMoveOnError fileOrDirectory'
-                else putFileMoveOnError fileOrDirectory'
-          runApp app config'
+            Upload (UploadOptions fileOrDirectory' _) -> do
+              isDir <- doesDirectoryExist fileOrDirectory'
+              let app = if isDir
+                    then uploadDirectoryMoveOnError fileOrDirectory'
+                    else putFileMoveOnError fileOrDirectory'
+              runApp app config
 
-  either print pure eitherRes
-
-applyCommonOptions :: CommonOptions -> Config -> Config
-applyCommonOptions CommonOptions{..} config@Config{..} =
-  let deleteAction' = maybe deleteAction fromBool coDeleteAfterUpload
-      serverUri' = fromMaybe serverUri coServerUri
-  in config { deleteAction = deleteAction', serverUri = serverUri' }
+      either print pure eitherRes

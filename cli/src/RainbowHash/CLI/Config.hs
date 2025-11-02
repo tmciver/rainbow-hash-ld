@@ -3,10 +3,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module RainbowHash.CLI.Config
-  ( Config(..)
+  ( StoredConfig(..)
+  , Config(..)
   , DeleteAction(..)
   , fromBool
-  , getConfig
+  , getStoredConfig
   ) where
 
 import Protolude
@@ -39,50 +40,64 @@ toBool :: DeleteAction -> Bool
 toBool Delete = True
 toBool NoDelete = False
 
+data StoredConfig = StoredConfig
+  { scServerUri :: Maybe URI
+  , scDeleteAction :: DeleteAction
+  , scExtensionsToIgnore :: Set Text
+  , scEmailMap :: Map Text EmailAddress
+  , scCertPath :: Maybe FilePath
+  , scKeyPath :: Maybe FilePath
+  } deriving (Show)
+
 data Config = Config
   { serverUri :: URI
   , deleteAction :: DeleteAction
   , extensionsToIgnore :: Set Text
   , emailMap :: Map Text EmailAddress
-  }
+  , certPath :: FilePath
+  , keyPath :: FilePath
+  } deriving (Show)
 
-instance ToJSON Config where
-  toJSON Config {..} =
-    let authority = either (panic "Could not get host from config") identity . uriAuthority $ serverUri
-        host = unRText . authHost $ authority
-        port = fromJust . authPort $ authority
-    in object
-       [ "server" .= object
-         [ "host" .= host
-         , "port" .= port
-         ]
-       , "delete-uploaded-file" .= toBool deleteAction
-       , "extensions-to-ignore" .= extensionsToIgnore
-       , "email-webid-map" .= toJSON emailMap
-       ]
+instance ToJSON StoredConfig where
+  toJSON StoredConfig {..} =
+    let serverObj = case scServerUri of
+          Nothing -> []
+          Just uri ->
+            let authority = either (panic "Could not get host from config") identity . uriAuthority $ uri
+                host = unRText . authHost $ authority
+                port = fromJust . authPort $ authority
+            in [ "server" .= object [ "host" .= host, "port" .= port ] ]
+        deleteObj = [ "delete-uploaded-file" .= toBool scDeleteAction ]
+        extensionsObj = [ "extensions-to-ignore" .= scExtensionsToIgnore ]
+        emailMapObj = [ "email-webid-map" .= toJSON scEmailMap ]
+        certPathObj = maybe [] (\p -> [ "cert-path" .= p ]) scCertPath
+        keyPathObj = maybe [] (\p -> [ "key-path" .= p ]) scKeyPath
+    in object $ serverObj <> deleteObj <> extensionsObj <> emailMapObj <> certPathObj <> keyPathObj
 
-instance FromJSON Config where
-  parseJSON = withObject "Config" $ \o -> do
-    server <- o .: "server"
-    host <- server .: "host"
-    port <- server .: "port"
+instance FromJSON StoredConfig where
+  parseJSON = withObject "StoredConfig" $ \o -> do
+    mServer <- o .:? "server"
+    scServerUri <- for mServer $ \server -> do
+      host <- server .: "host"
+      port <- server .: "port"
+      pure $ getURI host port
     delete <- o .:? "delete-uploaded-file" .!= False
-    extensionsToIgnore <- o .:? "extensions-to-ignore" .!= Set.empty
-    emailMap <- o .:? "email-webid-map" .!= Map.empty
-    let serverUri = getURI host port
-        deleteAction = fromBool delete
-    pure Config {..}
+    scExtensionsToIgnore <- o .:? "extensions-to-ignore" .!= Set.empty
+    scEmailMap <- o .:? "email-webid-map" .!= Map.empty
+    scCertPath <- o .:? "cert-path"
+    scKeyPath <- o .:? "key-path"
+    let scDeleteAction = fromBool delete
+    pure StoredConfig {..}
 
-instance Default Config where
-  def = let host = "localhost"
-            port :: Natural
-            port = 3000
-            deleteAction = NoDelete
-            extensionsToIgnore = Set.empty
-            emailMap = Map.empty
-        in case mkURI ("http://" <> host <> ":" <> show port) of
-             Just serverUri -> Config {..}
-             Nothing -> panic "Could not create a URI to the server."
+instance Default StoredConfig where
+  def = StoredConfig
+    { scServerUri = Nothing
+    , scDeleteAction = NoDelete
+    , scExtensionsToIgnore = Set.empty
+    , scEmailMap = Map.empty
+    , scCertPath = Nothing
+    , scKeyPath = Nothing
+    }
 
 getURI :: Text -> Natural -> URI
 getURI host port =
@@ -91,24 +106,24 @@ getURI host port =
 getConfigFile :: IO FilePath
 getConfigFile = (</> "cli" </> "config.yaml") <$> D.getXdgDirectory D.XdgConfig "caldron"
 
-getConfig :: IO Config
-getConfig = do
-  maybeConfig <- getConfigFromFile
+getStoredConfig :: IO StoredConfig
+getStoredConfig = do
+  maybeConfig <- getStoredConfigFromFile
   case maybeConfig of
     Just config -> pure config
     Nothing -> do
       writeLog LevelInfo "Unable to read configuration."
-      writeConfigToFile def
+      writeStoredConfigToFile def
       pure def
 
-writeConfigToFile :: Config -> IO ()
-writeConfigToFile config = do
+writeStoredConfigToFile :: StoredConfig -> IO ()
+writeStoredConfigToFile config = do
   configFile <- getConfigFile
   writeLog LevelInfo $ "Writing config to file " <> T.pack configFile
   YAML.encodeFile configFile config
 
-getConfigFromFile :: IO (Maybe Config)
-getConfigFromFile = do
+getStoredConfigFromFile :: IO (Maybe StoredConfig)
+getStoredConfigFromFile = do
   configFile <- getConfigFile
   writeLog LevelInfo $ "Looking for configuration in file " <> T.pack configFile
   let configDir = takeDirectory configFile

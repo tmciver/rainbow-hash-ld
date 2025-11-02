@@ -8,10 +8,10 @@ import Protolude
 import Options.Applicative (execParser)
 
 import RainbowHash.Command (runCommand, options)
-import RainbowHash.CLI.Config (getConfig)
+import RainbowHash.CLI.Config (getStoredConfig)
 
 main :: IO ()
 main = do
-  config <- getConfig
+  storedConfig <- getStoredConfig
   cmd <- execParser options
-  runCommand config cmd
+  runCommand storedConfig cmd
