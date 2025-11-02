@@ -10,6 +10,7 @@ module RainbowHash.Command
   ) where
 
 import Protolude
+import Control.Error (note)
 
 import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM, strOption)
 import Text.URI (URI)
@@ -102,15 +103,9 @@ mkConfig
   -> Either Text Config
 mkConfig cmd StoredConfig{..} = do
   let CommonOptions{..} = getCommonOptions cmd
-  serverUri <- case coServerUri <|> scServerUri of
-    Just u -> Right u
-    Nothing -> Left "Server URI is not specified."
-  certPath <- case coCertPath <|> scCertPath of
-    Just p -> Right p
-    Nothing -> Left "Certificate path is not specified."
-  keyPath <- case coKeyPath <|> scKeyPath of
-    Just p -> Right p
-    Nothing -> Left "Key path is not specified."
+  serverUri <- note "Server URI is not specified." $ coServerUri <|> scServerUri
+  certPath <- note "Certificate path is not specified." $ coCertPath <|> scCertPath
+  keyPath <- note "Key path is not specified." $ coKeyPath <|> scKeyPath
   let deleteAction = maybe scDeleteAction fromBool coDeleteAfterUpload
       extensionsToIgnore = scExtensionsToIgnore
       emailMap = scEmailMap
