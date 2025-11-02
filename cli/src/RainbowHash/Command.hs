@@ -11,7 +11,10 @@ module RainbowHash.Command
 
 import Protolude
 
-import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag')
+import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM)
+import Text.URI (URI)
+import qualified Text.URI as URI
+import qualified Data.Text as T
 
 import RainbowHash.CLI (putFileMoveOnError, watchDirectoryMoveOnError, uploadDirectoryMoveOnError)
 import RainbowHash.CLI.Config (Config (..), fromBool)
@@ -26,14 +29,19 @@ data Command
   | Upload UploadOptions
   deriving (Show)
 
+data CommonOptions = CommonOptions
+  { coDeleteAfterUpload :: Maybe Bool
+  , coServerUri :: Maybe URI
+  } deriving (Show)
+
 data WatchDirOptions = WatchDirOptions
   { dirToWatch :: FilePath
-  , wdoDeleteAfterUpload :: Maybe Bool
+  , wdoCommon :: CommonOptions
   } deriving (Show)
 
 data UploadOptions = UploadOptions
   { fileOrDirectory :: FilePath
-  , uoDeleteAfterUpload :: Maybe Bool
+  , uoCommon :: CommonOptions
   } deriving (Show)
 
 deleteAfterFlag :: Parser Bool
@@ -45,17 +53,27 @@ keepFlag = flag' True (long "keep-after-upload" <> short 'k' <> help "Don not de
 deleteParser :: Parser (Maybe Bool)
 deleteParser = optional $ deleteAfterFlag <|> keepFlag
 
+uriReader :: ReadM URI
+uriReader = eitherReader $ \s -> case URI.mkURI (T.pack s) of
+  Just uri -> Right uri
+  Nothing -> Left $ "Could not parse URI: " <> s
+
+commonOptionsParser :: Parser CommonOptions
+commonOptionsParser = CommonOptions
+  <$> deleteParser
+  <*> optional (option uriReader (long "server-uri" <> help "The URI of the rainbow-hash server."))
+
 watchCommand :: Parser Command
 watchCommand = WatchDir <$>
   ( WatchDirOptions
     <$> strArgument (metavar "DIR" <> help "The directory to watch")
-    <*> deleteParser)
+    <*> commonOptionsParser)
 
 uploadCommand :: Parser Command
 uploadCommand = Upload <$>
   ( UploadOptions
     <$> strArgument (metavar "FILE-OR-DIR" <> help "The file or directory to upload")
-    <*> deleteParser)
+    <*> commonOptionsParser)
 
 commandParser :: Parser Command
 commandParser = subparser
@@ -76,16 +94,22 @@ runCommand
   -> IO ()
 runCommand config cmd = do
   eitherRes <- case cmd of
-        WatchDir (WatchDirOptions dir shouldDelete) -> do
-          let config' = config { deleteAction = maybe (deleteAction config) fromBool shouldDelete }
+        WatchDir (WatchDirOptions dir commonOpts) -> do
+          let config' = applyCommonOptions commonOpts config
           runApp (watchDirectoryMoveOnError dir) config'
-          
-        Upload (UploadOptions fileOrDirectory' shouldDelete) -> do
+
+        Upload (UploadOptions fileOrDirectory' commonOpts) -> do
           isDir <- doesDirectoryExist fileOrDirectory'
-          let config' = config { deleteAction = maybe (deleteAction config) fromBool shouldDelete }
+          let config' = applyCommonOptions commonOpts config
               app = if isDir
                 then uploadDirectoryMoveOnError fileOrDirectory'
                 else putFileMoveOnError fileOrDirectory'
           runApp app config'
 
   either print pure eitherRes
+
+applyCommonOptions :: CommonOptions -> Config -> Config
+applyCommonOptions CommonOptions{..} config@Config{..} =
+  let deleteAction' = maybe deleteAction fromBool coDeleteAfterUpload
+      serverUri' = fromMaybe serverUri coServerUri
+  in config { deleteAction = deleteAction', serverUri = serverUri' }
