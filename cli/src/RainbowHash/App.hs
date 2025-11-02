@@ -59,20 +59,16 @@ instance HttpWrite App where
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
 
     let
-      -- Assuming Config has fields `clientCertPath :: Maybe FilePath` and
-      -- `clientKeyPath :: Maybe FilePath`. These will need to be added to the
-      -- Config data type.
-      mCertConfig = (,) <$> clientCertPath config <*> clientKeyPath config
       mAuth = uriAuthority sUri
       mHostName = T.unpack . unRText . authHost <$> mAuth
       mPort = BS8.pack . show <$> uriPort sUri
 
-    managerSettings <- case (mCertConfig, mHostName) of
-      (Just (certPath, keyPath), Just hostName) -> do
+    managerSettings <- case mHostName of
+      Just hostName -> do
         eCred <- liftIO . try $ do
-          certs <- X509File.readSignedObject certPath
+          certs <- X509File.readSignedObject (certPath config)
           let certChain = CertificateChain $ map (X509.signedObject . getSigned) certs
-          [privKey] <- X509File.readKeyFile keyPath -- Assumes one private key in file.
+          [privKey] <- X509File.readKeyFile (keyPath config) -- Assumes one private key in file.
           pure (certChain, privKey)
 
         case eCred of
@@ -95,8 +91,7 @@ instance HttpWrite App where
                 tlsSettings = Conn.TLSSettings clientParams
                 settings = TLS.mkManagerSettings tlsSettings Nothing
             pure $ settings { managerResponseTimeout = responseTimeoutMicro 60000000 }
-      (Nothing, _) -> throwError $ PostError "Client certificate and/or key path not configured."
-      (Just _, Nothing) -> do
+      Nothing -> do
         logInfoN "Could not determine hostname from server URI, proceeding without client certificate."
         pure $ defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 }
 
