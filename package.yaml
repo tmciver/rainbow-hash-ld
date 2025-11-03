@@ -106,12 +106,17 @@ executables:
     - aeson
     - bytestring
     - containers
+    - crypton-connection
+    - crypton-x509
+    - crypton-x509-store
+    - crypton-x509-validation
     - data-default
     - directory
     - exceptions
     - filepath
     - fsnotify
     - http-client
+    - http-client-tls
     - http-types
     - lens
     - modern-uri
@@ -119,6 +124,7 @@ executables:
     - optparse-applicative
     - ordered-containers
     - text
+    - tls
     - unix
     - wreq
     - yaml

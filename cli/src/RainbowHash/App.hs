@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -20,23 +22,20 @@ import Network.HTTP.Client.MultipartFormData (partFile)
 import Network.Wreq (defaults, manager, postWith, checkResponse, headWith, header)
 import Network.HTTP.Client (Response(responseStatus), ManagerSettings (managerResponseTimeout), defaultManagerSettings, responseTimeoutMicro)
 import Network.HTTP.Types (statusIsSuccessful)
-import Text.URI (renderStr, URI, mkURI, render, uriAuthority, authHost, unRText, uriPort)
+import Text.URI (renderStr, URI, mkURI, render, uriAuthority, authHost, unRText, Authority(..), unRText)
 import Control.Lens (set, (.~))
 import Control.Monad.Catch (MonadThrow)
 import qualified System.Directory as Dir
 import System.FSNotify (Event(..), Action, EventIsDirectory(..), withManager, watchDir)
 import System.FilePath ((</>), takeFileName)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
-import           Data.Default.Class (def)
-import           Data.Maybe (fromMaybe)
+import           Data.Default (def)
 import           Data.X509 (CertificateChain(..))
 import qualified Data.X509 as X509
 import qualified Data.X509.File as X509File
-import           Data.X509.Validation (getSigned)
-import qualified Network.Connection as Conn
+import Network.Connection (TLSSettings(..))
 import qualified Network.HTTP.Client.TLS as TLS
-import qualified Network.TLS as TLS
+import Network.TLS (defaultParamsClient, clientHooks, onCertificateRequest)
 
 import RainbowHash.CLI.Config (Config(..))
 import RainbowHash (Hash)
@@ -58,42 +57,28 @@ instance HttpWrite App where
 
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
 
-    let
-      mAuth = uriAuthority sUri
-      mHostName = T.unpack . unRText . authHost <$> mAuth
-      mPort = BS8.pack . show <$> uriPort sUri
+    Authority{..} <- case uriAuthority sUri of
+      Left _ -> throwError $ PostError "Configure server URL cannot be a relative URL."
+      Right auth -> pure auth
 
-    managerSettings <- case mHostName of
-      Just hostName -> do
-        eCred <- liftIO . try $ do
-          certs <- X509File.readSignedObject (certPath config)
-          let certChain = CertificateChain $ map (X509.signedObject . getSigned) certs
-          [privKey] <- X509File.readKeyFile (keyPath config) -- Assumes one private key in file.
-          pure (certChain, privKey)
+    eCred <- liftIO . try $ do
+      certs :: [X509.SignedExact X509.Certificate] <- X509File.readSignedObject (certPath config)
+      let certChain = CertificateChain certs -- $ map (X509.signedObject . X509.getSigned) certs
+      [privKey] <- X509File.readKeyFile (keyPath config) -- Assumes one private key in file.
+      pure (certChain, privKey)
 
-        case eCred of
+    managerSettings <- case eCred of
           Left (e :: SomeException) -> do
             let errMsg = "Failed to load client certificate: " <> show e
             logErrorN errMsg
             throwError $ PostError errMsg
-          Right cred -> do
-            let clientParams = TLS.ClientParams
-                  { TLS.clientUseMaxFragmentLength = Nothing
-                  , TLS.clientServerIdentification = (hostName, fromMaybe "443" mPort)
-                  , TLS.clientUseServerNameIndication = True
-                  , TLS.clientWantSessionResume = Nothing
-                  , TLS.clientShared = def
-                  , TLS.clientHooks = def
-                  , TLS.clientSupported = def
-                  , TLS.clientDebug = def
-                  , TLS.clientUseCertificate = Just cred
-                  }
-                tlsSettings = Conn.TLSSettings clientParams
+          Right (certChain, privKey) -> do
+            let hostname = T.unpack $ unRText authHost
+                hooks = def { onCertificateRequest = const (pure . Just $ (certChain, privKey)) }
+                clientParams = (defaultParamsClient hostname "") { clientHooks = hooks }
+                tlsSettings = TLSSettings clientParams
                 settings = TLS.mkManagerSettings tlsSettings Nothing
             pure $ settings { managerResponseTimeout = responseTimeoutMicro 60000000 }
-      Nothing -> do
-        logInfoN "Could not determine hostname from server URI, proceeding without client certificate."
-        pure $ defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 60000000 }
 
     let part = partFile "" fp
         emailBS = T.encodeUtf8 . getEmailAddress $ emailAddress

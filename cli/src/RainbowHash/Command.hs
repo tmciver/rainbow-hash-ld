@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
@@ -10,7 +11,7 @@ module RainbowHash.Command
   ) where
 
 import Protolude
-import Control.Error (note)
+--import Control.Error (note)
 
 import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM, strOption)
 import Text.URI (URI)
@@ -18,7 +19,7 @@ import qualified Text.URI as URI
 import qualified Data.Text as T
 
 import RainbowHash.CLI (putFileMoveOnError, watchDirectoryMoveOnError, uploadDirectoryMoveOnError)
-import RainbowHash.CLI.Config (StoredConfig (..), Config (..), fromBool, DeleteAction (..))
+import RainbowHash.CLI.Config (StoredConfig (..), Config (..), fromBool)
 import RainbowHash.App (runApp)
 import System.Directory (doesDirectoryExist)
 

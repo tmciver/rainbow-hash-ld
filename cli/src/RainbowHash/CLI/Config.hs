@@ -31,6 +31,7 @@ import RainbowHash.Logger (writeLog)
 data DeleteAction
   = Delete
   | NoDelete
+  deriving (Eq, Show)
 
 fromBool :: Bool -> DeleteAction
 fromBool True = Delete
