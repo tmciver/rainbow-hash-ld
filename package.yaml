@@ -54,7 +54,9 @@ executables:
       - RainbowHash.View.File
       - RainbowHash.View.HTML
       - RainbowHash.View.Home
+      - RainbowHash.EmailAddress
     dependencies:
+      - aeson
       - bytestring
       - case-insensitive
       - containers
