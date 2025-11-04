@@ -57,12 +57,15 @@ executables:
       - RainbowHash.View.HTML
       - RainbowHash.View.Home
     dependencies:
+      - aeson
       - bytestring
       - case-insensitive
       - containers
       - crypton
       - crypton-x509
       - crypton-pem
+      - data-default
+      - directory
       - exceptions
       - filepath
       - hsparql
@@ -91,6 +94,7 @@ executables:
       - uuid
       - wai
       - warp
+      - yaml
 
   rhld:
     main:                Main.hs

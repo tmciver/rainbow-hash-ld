@@ -11,7 +11,7 @@ module RainbowHash.Options
 import           Protolude
 
 import           Numeric.Natural     (Natural)
-import           Options.Applicative (Parser, ReadM, auto, eitherReader, fullDesc, header, help, helper, info, long, metavar, option, optional, progDesc, short, showDefault, strOption, value, ParserInfo)
+import           Options.Applicative (Parser, ReadM, auto, eitherReader, fullDesc, header, help, helper, info, long, metavar, option, progDesc, short, showDefault, strOption, value, ParserInfo)
 import           Text.URI            (URI, mkURI)
 
 import           RainbowHash.Config (Config (..), StoredConfig (..))

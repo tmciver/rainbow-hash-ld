@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -28,7 +29,7 @@ instance ToJSON URI where
 
 instance FromJSON URI where
   parseJSON = withText "URI" $ \t ->
-    either (fail . show) pure . mkURI $ t
+    either (panic . show) pure . mkURI $ t
 
 data StoredConfig = StoredConfig
   { scBlobStoreUrl   :: Maybe URI

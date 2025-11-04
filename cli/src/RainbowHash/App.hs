@@ -80,6 +80,7 @@ instance HttpWrite App where
                 settings = TLS.mkManagerSettings tlsSettings Nothing
             pure $ settings { managerResponseTimeout = responseTimeoutMicro 60000000 }
 
+    -- TODO: include file name
     let part = partFile "" fp
         emailBS = T.encodeUtf8 . getEmailAddress $ emailAddress
         opts = defaults & set checkResponse (Just $ \_ _ -> pure ())
