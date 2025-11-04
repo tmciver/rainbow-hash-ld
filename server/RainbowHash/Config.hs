@@ -11,17 +11,24 @@ module RainbowHash.Config
 import Protolude
 
 import           Control.Monad.Logger (LogLevel(LevelInfo))
-import           Data.Aeson (FromJSON(..), ToJSON(..), (.:?), (.!=), (.=), object, withObject)
+import           Data.Aeson (FromJSON(..), ToJSON(..), (.:?), (.!=), (.=), object, withObject, withText)
 import           Data.Default (Default(..))
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as YAML
 import qualified System.Directory as D
 import           System.FilePath ((</>), takeDirectory)
-import           Text.URI (URI)
+import           Text.URI (URI, mkURI, render)
 
 import           RainbowHash.EmailAddress (EmailAddress)
 import           RainbowHash.Logger (writeLog)
+
+instance ToJSON URI where
+  toJSON = toJSON . render
+
+instance FromJSON URI where
+  parseJSON = withText "URI" $ \t ->
+    either (fail . show) pure . mkURI $ t
 
 data StoredConfig = StoredConfig
   { scBlobStoreUrl   :: Maybe URI
