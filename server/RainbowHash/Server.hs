@@ -18,7 +18,7 @@ import           Text.URI               (URI, mkURI, render)
 import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import qualified RainbowHash.App as App
-import           RainbowHash.Config     (Config (..))
+import           RainbowHash.Config     (Config (..), webIdFromEmail)
 import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
@@ -31,6 +31,7 @@ type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
     :<|> "files" :> Header "Host" Text
+                 :> Header "From" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> PostNoContent
     :<|> "file"  :>
@@ -138,20 +139,22 @@ filesHandler
   :: Config
   -> User
   -> Maybe Text
+  -> Maybe Text
   -> MultipartData Tmp
   -> Handler NoContent
-filesHandler config user mHost multipartData = do
+filesHandler config user mHost mFrom multipartData = do
   case (files multipartData, mHost) of
-    ([fileData], Just host) -> uploadFile host fileData (inputs multipartData)
+    ([fileData], Just host) -> uploadFile host mFrom fileData (inputs multipartData)
     (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
           :: Text
+          -> Maybe Text
           -> FileData Tmp
           -> [Input]
           -> Handler NoContent
-        uploadFile host' fileData fields = do
+        uploadFile host' mFrom fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -160,8 +163,9 @@ filesHandler config user mHost multipartData = do
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
+              mAuthorUri = mFrom >>= (webIdFromEmail config)
 
-          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right _ -> throwError err303 { errHeaders = [("Location", "/")] }

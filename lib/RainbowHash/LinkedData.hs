@@ -98,13 +98,14 @@ putFile
   => v
   -> Text
   -> URI -- ^URI of agent putting the file
+  -> Maybe URI -- ^URI of author of the file
   -> Maybe Text -- ^filename
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
   -> Maybe MediaType
   -> FileNodeCreateOption
   -> m URI
-putFile v host createdByUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
+putFile v host createdByUri _maybeAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
 
   logInfoN $ "Adding file "
     <> fromMaybe "<unnamed>" (maybeFileName <&> \fn -> "\"" <> fn <> "\"")
