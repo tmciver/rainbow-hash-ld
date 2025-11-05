@@ -10,6 +10,7 @@ import           Protolude              hiding (Handler)
 
 import           Control.Monad.Logger          (LogLevel(LevelInfo))
 import qualified Data.ByteString.Lazy   as LBS
+import qualified Data.Map as Map
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
@@ -18,7 +19,7 @@ import           Text.URI               (URI, mkURI, render)
 import           RainbowHash.Logger            (writeLog)
 import           RainbowHash.App        (AppError, appErrorToString, runApp)
 import qualified RainbowHash.App as App
-import           RainbowHash.Config     (Config (..), webIdFromEmail)
+import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
@@ -26,6 +27,7 @@ import           RainbowHash.User (User, userWebId)
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
+import RainbowHash.EmailAddress (EmailAddress(..))
 
 type FilesAPI =
   WebIDUserAuth :>
@@ -148,13 +150,16 @@ filesHandler config user mHost mFrom multipartData = do
     (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
-  where uploadFile
+  where webIdFromEmail :: EmailAddress -> Config -> Maybe URI
+        webIdFromEmail email = Map.lookup email . webIdMap
+
+        uploadFile
           :: Text
           -> Maybe Text
           -> FileData Tmp
           -> [Input]
           -> Handler NoContent
-        uploadFile host' mFrom fileData fields = do
+        uploadFile host' mFrom' fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -163,7 +168,13 @@ filesHandler config user mHost mFrom multipartData = do
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
-              mAuthorUri = mFrom >>= (webIdFromEmail config)
+
+          -- See if there's an on-behalf-of user
+          mAuthorUri <- case mFrom' <&> EmailAddress of
+            Nothing -> pure Nothing
+            Just email -> case webIdFromEmail email config of
+              Nothing -> throwError err500 { errBody = LBS.fromStrict . encodeUtf8 $ "No WebId associated with email address " <> getEmailAddress email }
+              Just authorUri -> pure $ Just authorUri
 
           either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
