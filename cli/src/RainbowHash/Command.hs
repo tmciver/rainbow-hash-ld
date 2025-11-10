@@ -13,7 +13,7 @@ module RainbowHash.Command
 import Protolude
 --import Control.Error (note)
 
-import Options.Applicative (Parser, metavar, strArgument, long, short, help, subparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM, strOption)
+import Options.Applicative (Parser, metavar, strArgument, long, short, help, hsubparser, command, info, progDesc, ParserInfo, fullDesc, header, flag', option, eitherReader, ReadM, strOption, helper)
 import Text.URI (URI)
 import qualified Text.URI as URI
 import qualified Data.Text as T
@@ -52,7 +52,7 @@ deleteAfterFlag :: Parser Bool
 deleteAfterFlag = flag' True (long "delete-after-upload" <> short 'd' <> help "Whether to delete the uploaded file")
 
 keepFlag :: Parser Bool
-keepFlag = flag' True (long "keep-after-upload" <> short 'k' <> help "Don not delete a file after upload")
+keepFlag = flag' True (long "keep-after-upload" <> short 'k' <> help "Do not delete a file after upload")
 
 deleteParser :: Parser (Maybe Bool)
 deleteParser = optional $ deleteAfterFlag <|> keepFlag
@@ -82,13 +82,13 @@ uploadCommand = Upload <$>
     <*> commonOptionsParser)
 
 commandParser :: Parser Command
-commandParser = subparser
+commandParser = hsubparser
   ( command "watch" (info watchCommand (progDesc "Watch a given directory and upload files that are added to it. Does not upload existing files."))
  <> command "upload" (info uploadCommand (progDesc "Upload the given file or the files in the given directory."))
   )
 
 options :: ParserInfo Command
-options = info commandParser
+options = info (commandParser <**> helper)
   ( fullDesc
  <> progDesc "A command-line interface for a rainbow-hash server."
  <> header "A header for the CLI for rainbow-hash."

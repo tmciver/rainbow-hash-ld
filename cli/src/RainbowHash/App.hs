@@ -19,7 +19,7 @@ import qualified Data.Set.Ordered as OSet
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Network.HTTP.Client.MultipartFormData (partFile)
-import Network.Wreq (defaults, manager, postWith, checkResponse, headWith, header)
+import Network.Wreq (defaults, manager, postWith, checkResponse, headWith, header, redirects)
 import Network.HTTP.Client (Response(responseStatus), ManagerSettings (managerResponseTimeout), defaultManagerSettings, responseTimeoutMicro)
 import Network.HTTP.Types (statusIsSuccessful)
 import Text.URI (renderStr, URI, mkURI, render, uriAuthority, authHost, unRText, Authority(..), unRText)
@@ -35,7 +35,7 @@ import qualified Data.X509 as X509
 import qualified Data.X509.File as X509File
 import Network.Connection (TLSSettings(..))
 import qualified Network.HTTP.Client.TLS as TLS
-import Network.TLS (defaultParamsClient, clientHooks, onCertificateRequest)
+import Network.TLS (defaultParamsClient, clientHooks, onCertificateRequest, onServerCertificate)
 
 import RainbowHash.CLI.Config (Config(..))
 import RainbowHash (Hash)
@@ -74,13 +74,14 @@ instance HttpWrite App where
             throwError $ PostError errMsg
           Right (certChain, privKey) -> do
             let hostname = T.unpack $ unRText authHost
-                hooks = def { onCertificateRequest = const (pure . Just $ (certChain, privKey)) }
+                hooks = def { onCertificateRequest = const (pure . Just $ (certChain, privKey))
+                            , onServerCertificate = \_ _ _ _ -> pure [] -- FIXME: doing this for now as I don't know a better way to prevent the CA check
+                            }
                 clientParams = (defaultParamsClient hostname "") { clientHooks = hooks }
                 tlsSettings = TLSSettings clientParams
                 settings = TLS.mkManagerSettings tlsSettings Nothing
             pure $ settings { managerResponseTimeout = responseTimeoutMicro 60000000 }
 
-    -- TODO: include file name
     let part = partFile "" fp
         emailBS = T.encodeUtf8 . getEmailAddress $ emailAddress
         opts = defaults & set checkResponse (Just $ \_ _ -> pure ())
@@ -96,7 +97,7 @@ instance HttpWrite App where
         if statusIsSuccessful . responseStatus $ res
           then logInfoN ("Success uploading file." :: Text)
           else do
-            logErrorN ("Error uploading file." :: Text)
+            logErrorN $ ("Error uploading file." :: Text) <> show res
             throwError $ PostError "Non-success HTTP status returned"
 
 hashToUrl

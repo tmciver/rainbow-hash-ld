@@ -29,7 +29,7 @@ import Control.Monad.Logger (MonadLogger, logInfoN, logErrorN)
 import RainbowHash (calcHash, Hash)
 import System.FilePath ((</>), takeDirectory)
 import RainbowHash.CLI.Config (DeleteAction(..))
-import RainbowHash.EmailAddress (EmailAddress)
+import RainbowHash.EmailAddress (EmailAddress(..))
 import qualified Data.Text as T
 
 data AppError
@@ -133,16 +133,14 @@ putFile filePath = do
     else  do
       -- Calculate the hash of the file's content.
       bs <- readFile filePath
-      let hash' = calcHash bs
 
-      -- Only upload the file if it doesn't exist on the server.
-      fileExists <- doesFileExistInStore hash'
-      if fileExists
-        then logInfoN ("File exists on server; not uploading." :: Text)
-        else do
-          username <- getFileOwner filePath
-          userEmail <- fromJustM (getUserEmail username) (throwError $ EmailNotFound username)
-          postFile filePath userEmail
+      -- Find the email configured for the file owner
+      username <- getFileOwner filePath
+      userEmail <- fromJustM (getUserEmail username) (throwError $ EmailNotFound username)
+      logInfoN $ "Found email " <> getEmailAddress userEmail <> " for user " <> username
+
+      -- Post the file
+      postFile filePath userEmail
 
       -- Delete the local file if configured.
       deleteAction <- asks (getField @"deleteAction")

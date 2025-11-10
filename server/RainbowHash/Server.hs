@@ -8,7 +8,7 @@ module RainbowHash.Server (app) where
 
 import           Protolude              hiding (Handler)
 
-import           Control.Monad.Logger          (LogLevel(LevelInfo))
+import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
 import           Network.HTTP.Media     (MediaType)
@@ -153,6 +153,17 @@ filesHandler config user mHost mFrom multipartData = do
   where webIdFromEmail :: EmailAddress -> Config -> Maybe URI
         webIdFromEmail email = Map.lookup email . webIdMap
 
+        getWebIdForEmail :: Config -> EmailAddress -> Handler (Maybe URI)
+        getWebIdForEmail config' email = do
+          case webIdFromEmail email config' of
+            Nothing -> do
+              let msg = "No WebId associated with email address " <> getEmailAddress email
+              liftIO $ writeLog LevelError msg
+              throwError err500 { errBody = LBS.fromStrict $ encodeUtf8 msg }
+            Just authorUri -> do
+              liftIO $ writeLog LevelInfo $ "Found WebID " <> render authorUri <> " associated with email " <> getEmailAddress email
+              pure $ Just authorUri
+
         uploadFile
           :: Text
           -> Maybe Text
@@ -170,11 +181,7 @@ filesHandler config user mHost mFrom multipartData = do
               fileNodeCreateOption = getFileNodeCreationOption fields
 
           -- See if there's an on-behalf-of user
-          mAuthorUri <- case mFrom' <&> EmailAddress of
-            Nothing -> pure Nothing
-            Just email -> case webIdFromEmail email config of
-              Nothing -> throwError err500 { errBody = LBS.fromStrict . encodeUtf8 $ "No WebId associated with email address " <> getEmailAddress email }
-              Just authorUri -> pure $ Just authorUri
+          mAuthorUri <- maybe (pure Nothing) (getWebIdForEmail config) (mFrom' <&> EmailAddress)
 
           either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
