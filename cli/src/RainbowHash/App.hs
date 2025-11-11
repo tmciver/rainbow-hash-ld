@@ -19,10 +19,10 @@ import qualified Data.Set.Ordered as OSet
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Network.HTTP.Client.MultipartFormData (partFile)
-import Network.Wreq (defaults, manager, postWith, checkResponse, headWith, header, redirects)
-import Network.HTTP.Client (Response(responseStatus), ManagerSettings (managerResponseTimeout), defaultManagerSettings, responseTimeoutMicro)
+import Network.Wreq (defaults, manager, postWith, checkResponse, header)
+import Network.HTTP.Client (Response(responseStatus), ManagerSettings (managerResponseTimeout), responseTimeoutMicro)
 import Network.HTTP.Types (statusIsSuccessful)
-import Text.URI (renderStr, URI, mkURI, render, uriAuthority, authHost, unRText, Authority(..), unRText)
+import Text.URI (renderStr, uriAuthority, authHost, unRText, Authority(..), unRText)
 import Control.Lens (set, (.~))
 import Control.Monad.Catch (MonadThrow)
 import qualified System.Directory as Dir
@@ -38,8 +38,7 @@ import qualified Network.HTTP.Client.TLS as TLS
 import Network.TLS (defaultParamsClient, clientHooks, onCertificateRequest, onServerCertificate)
 
 import RainbowHash.CLI.Config (Config(..))
-import RainbowHash (Hash)
-import RainbowHash.CLI (HttpRead(..), HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
+import RainbowHash.CLI (HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
 import RainbowHash.EmailAddress (getEmailAddress)
 import RainbowHash.Logger (writeLog)
 
@@ -100,33 +99,12 @@ instance HttpWrite App where
             logErrorN $ ("Error uploading file." :: Text) <> show res
             throwError $ PostError "Non-success HTTP status returned"
 
-hashToUrl
-  :: ( MonadThrow m
-     , MonadReader Config m
-     )
-  => Hash
-  -> m URI
-hashToUrl h = do
-  host <- asks serverUri
-  mkURI $ render host <> "/blob/" <> h
-
 getFileOwnerUsername :: FilePath -> IO Text
 getFileOwnerUsername path = do
   status <- getFileStatus path
   let ownerId = fileOwner status
   userEntry <- getUserEntryForID ownerId
   return . T.pack . userName $ userEntry
-
-instance HttpRead App where
-  doesFileExistInStore h = do
-    fileUrl <- hashToUrl h
-    logInfoN $ "Checking if file exists on server: " <> render fileUrl
-    let opts = defaults & set checkResponse (Just $ \_ _ -> pure ()) -- I'm not sure if this is working: still get an exception if server is not up.
-                        & manager .~ Left defaultManagerSettings { managerResponseTimeout = responseTimeoutMicro 3000000 }
-    eitherRes <- liftIO $ try $ headWith opts (T.unpack . render $ fileUrl)
-    pure $ case eitherRes of
-      Left (SomeException _) -> False
-      Right res -> statusIsSuccessful . responseStatus $ res
 
 instance FileSystemRead App where
   readFile = liftIO . BS.readFile

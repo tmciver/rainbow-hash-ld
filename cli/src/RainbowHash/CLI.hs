@@ -7,8 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 module RainbowHash.CLI
-  ( HttpRead(..)
-  , HttpWrite(..)
+  ( HttpWrite(..)
   , FileSystemRead(..)
   , FileSystemWrite(..)
   , DirectoryWatch(..)
@@ -26,7 +25,6 @@ import Data.Set.Ordered (OSet)
 import qualified Data.Set.Ordered as OSet
 import Control.Monad.Logger (MonadLogger, logInfoN, logErrorN)
 
-import RainbowHash (calcHash, Hash)
 import System.FilePath ((</>), takeDirectory)
 import RainbowHash.CLI.Config (DeleteAction(..))
 import RainbowHash.EmailAddress (EmailAddress(..))
@@ -39,9 +37,6 @@ data AppError
 
 class MonadError AppError m => HttpWrite m where
   postFile :: FilePath -> EmailAddress -> m ()
-
-class HttpRead m where
-  doesFileExistInStore :: Hash -> m Bool
 
 class Monad m => FileSystemRead m where
   readFile :: FilePath -> m ByteString
@@ -67,7 +62,6 @@ watchDirectoryMoveOnError
   :: ( DirectoryWatch m
      , FileSystemRead m
      , FileSystemWrite m
-     , HttpRead m
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
@@ -112,7 +106,6 @@ fromJustM mm onNothing = do
 putFile
   :: ( FileSystemRead m
      , FileSystemWrite m
-     , HttpRead m
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
@@ -131,9 +124,6 @@ putFile filePath = do
   if shouldBeIgnored'
     then logInfoN $ "Ignoring " <> T.pack filePath
     else  do
-      -- Calculate the hash of the file's content.
-      bs <- readFile filePath
-
       -- Find the email configured for the file owner
       username <- getFileOwner filePath
       userEmail <- fromJustM (getUserEmail username) (throwError $ EmailNotFound username)
@@ -151,7 +141,6 @@ putFile filePath = do
 putFileMoveOnError
   :: ( FileSystemRead m
      , FileSystemWrite m
-     , HttpRead m
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
@@ -175,7 +164,6 @@ putFileMoveOnError filePath = do
 uploadDirectoryMoveOnError
   :: ( FileSystemRead m
      , FileSystemWrite m
-     , HttpRead m
      , HttpWrite m
      , HasField "deleteAction" env DeleteAction
      , HasField "extensionsToIgnore" env (Set Text)
