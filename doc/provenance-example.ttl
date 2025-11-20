@@ -1,0 +1,42 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix : <https://rainbowhash.com/> . # Base URI for resources on this server
+
+# The file that was uploaded, represented as a PROV-O Entity.
+# Its URI is based on its content hash.
+<files/some-file-hash>
+    a prov:Entity ;
+    rdfs:label "My Document" ;
+    prov:wasGeneratedBy <activity/some-upload-uuid> ;
+    prov:wasAttributedTo <https://jane.example.com/profile/card#me> .
+
+# The upload activity.
+<activity/some-upload-uuid>
+    a prov:Activity ;
+    rdfs:label "File Upload of 'My Document'" ;
+    prov:startedAtTime "2025-11-19T10:00:00Z"^^xsd:dateTime ;
+    prov:endedAtTime "2025-11-19T10:00:02Z"^^xsd:dateTime ;
+    prov:wasAssociatedWith <agents/rainbowhash-cli> .
+
+# The software agent that performed the upload.
+# It acted on behalf of Jane Doe, but this relationship is qualified below
+# to scope it to the specific upload activity.
+<agents/rainbowhash-cli>
+    a prov:SoftwareAgent, prov:Agent ;
+    rdfs:label "RainbowHash CLI v1.0" ;
+    prov:actedOnBehalfOf <https://jane.example.com/profile/card#me> ;
+    prov:qualifiedDelegation <delegation/some-upload-delegation-uuid> .
+
+# The delegation of authority from the user to the software agent for this specific upload.
+<delegation/some-upload-delegation-uuid>
+    a prov:Delegation ;
+    rdfs:label "Delegation for 'My Document' upload" ;
+    prov:agent <https://jane.example.com/profile/card#me> ; # The delegating agent
+    prov:hadActivity <activity/some-upload-uuid> .
+
+# The human user who initiated the upload, identified by their WebID.
+<https://jane.example.com/profile/card#me>
+    a prov:Person, prov:Agent ;
+    rdfs:label "Jane Doe" .
