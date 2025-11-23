@@ -11,7 +11,8 @@ import           Protolude
 import qualified Data.Map                 as Map
 import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
                                            RDF, Rdf, lnode, mkRdf, plainL,
-                                           triple, typedL, unode)
+                                           triple, typedL, unode, bnode, Node(BNode))
+import Data.Maybe (fromJust)
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as TE
 import           Data.Time.Clock          (UTCTime)
@@ -26,7 +27,8 @@ fileDataToRDF
   :: (Rdf a)
   => Text
   -> URI -- ^URI to the bytes of the file content.
-  -> URI -- ^URI of the agent that created the file.
+  -> URI -- ^URI of the agent that uploaded the file.
+  -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
   -> Maybe Text -- ^filename
   -> Integer    -- ^file size
   -> Maybe Text -- ^title
@@ -34,7 +36,7 @@ fileDataToRDF
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time mt = do
+fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc time mt = do
   let baseUrlText = "http://" <> host
 
   fileId <- nextRandom
@@ -59,6 +61,11 @@ fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time
         & Map.insert "prov" "http://www.w3.org/ns/prov#"
         & PrefixMappings
 
+      -- Create blank nodes for the upload prov:Activity and prov:Delegation
+      -- Gawd, I hate rdf4h!
+      uploadActivityNode = BNode "_:123"
+      delegationNode = BNode "_:456"
+
       triples =
 
         -- RDFS
@@ -68,6 +75,7 @@ fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time
                       (Just title, _) -> title
                       (_, Just fileName) -> "A file with name \"" <> fileName <> "\""
                       _ -> "A file with no name or title"
+            ownerUri = fromMaybe agentUri maybeOnBehalfOf
         in
           [triple fileUriNode (unode "rdfs:label") (lnode (plainL label))]
         <>
@@ -84,17 +92,18 @@ fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time
         , triple fileDataUriNode (unode "fo:size") (lnode (typedL (show size) "xsd:integer"))
         , triple fileDataUriNode (unode "dct:format") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))
         , triple fileDataUriNode (unode "dct:created") (lnode (typedL timeISO8601 "xsd:dateTime"))
-        , triple fileDataUriNode (unode "dct:creator") (unode $ render agentUri)
+        , triple fileDataUriNode (unode "dct:creator") (unode $ render ownerUri)
         ]
         <>
 
-        -- Point this file at the above FileData object.
+        -- Create a File object and point it at the above FileData object.
         [ triple fileUriNode (unode "rdf:type") (unode "fo:File")
         , triple fileUriNode (unode "fo:fileData") fileDataUriNode
         , triple fileUriNode (unode "fo:size") (lnode (typedL (show size) "xsd:integer"))
         , triple fileUriNode (unode "dct:created") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple fileUriNode (unode "dct:modified") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple fileUriNode (unode "dct:format") (lnode (plainL . TE.decodeUtf8 . renderHeader $ mt))
+        , triple fileUriNode (unode "dct:creator") (unode $ render ownerUri)
         ]
         <>
 
@@ -117,13 +126,32 @@ fileDataToRDF host blobUrl agentUri maybeFileName size maybeTitle maybeDesc time
         <>
 
         -- PROV
-        [ triple fileUriNode (unode "rdf:type") (unode "prov:Entity")
-        , triple fileUriNode (unode "prov:wasAttributedTo") (unode $ render agentUri)
+        [ triple uploadActivityNode (unode "rdf:type") (unode "prov:Activity")
+        , triple uploadActivityNode (unode "rdfs:label") (lnode (plainL $ "Upload activity" <> maybe "" (\fn -> " for '" <> fn <> "'") maybeFileName))
+        , triple uploadActivityNode (unode "prov:startedAtTime") (lnode (typedL timeISO8601 "xsd:dateTime"))
+        , triple uploadActivityNode (unode "prov:endedAtTime") (lnode (typedL timeISO8601 "xsd:dateTime"))
+        , triple uploadActivityNode (unode "prov:wasAssociatedWith") (unode $ render ownerUri)
+
+        
+
+        , triple fileUriNode (unode "rdf:type") (unode "prov:Entity")
+        , triple fileUriNode (unode "prov:wasAttributedTo") (unode $ render ownerUri)
         , triple fileUriNode (unode "prov:generatedAtTime") (lnode $ typedL timeISO8601 "xsd:dateTime")
+
         , triple fileDataUriNode (unode "rdf:type") (unode "prov:Entity")
-        , triple fileDataUriNode (unode "prov:wasAttributedTo") (unode $ render agentUri)
+        , triple fileDataUriNode (unode "prov:wasAttributedTo") (unode $ render ownerUri)
         , triple fileDataUriNode (unode "prov:generatedAtTime") (lnode $ typedL timeISO8601 "xsd:dateTime")
         ]
+        <>
+        case maybeOnBehalfOf of
+          -- We add delegation triples only if we have a WebID for an entity that was "acted of behalf of"
+          Just ownerUri' ->
+            [ triple delegationNode (unode "rdf:type") (unode "prov:Delegation")
+            , triple delegationNode (unode "rdfs:label") (lnode (plainL $ "Delegation for upload" <> maybe "" (\fn -> " of file '" <> fn <> "'") maybeFileName))
+            , triple delegationNode (unode "prov:agent") (unode $ render ownerUri')
+            , triple delegationNode (unode "prov:hadActivity") uploadActivityNode
+            ]
+          Nothing -> []
 
       rdf = mkRdf triples (Just $ BaseUrl baseUrlText) prefixes
 

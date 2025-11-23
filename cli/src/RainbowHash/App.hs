@@ -57,7 +57,7 @@ instance HttpWrite App where
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
 
     Authority{..} <- case uriAuthority sUri of
-      Left _ -> throwError $ PostError "Configure server URL cannot be a relative URL."
+      Left _ -> throwError $ PostError "Configured server URL cannot be a relative URL."
       Right auth -> pure auth
 
     eCred <- liftIO . try $ do

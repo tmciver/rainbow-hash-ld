@@ -21,6 +21,7 @@ import           Control.Monad.Catch           (MonadCatch, MonadMask,
 import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
                                                 toLogStr, logInfoN)
 import           Data.RDF                      (RDF, TList)
+import qualified Data.RDF as RDF4H
 import qualified Data.Text                     as T
 import qualified Data.Time.Clock               as Time
 import           System.FilePath               (takeFileName)
@@ -66,10 +67,17 @@ instance FilePut AppM FilePath where
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
-  putFileMetadata host blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt = do
+  putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc time mt = do
     logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt
+    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc time mt
+
+    -- Debug: print the RDF graph
+    -- Why TF do I need to pull out the PrefixMappings and Base URL?
+    -- let pm = RDF4H.prefixMappings rdf
+    --     base = RDF4H.unBaseUrl <$> RDF4H.baseUrl rdf
+    --     serializer = RDF4H.TurtleSerializer base pm
+    -- liftIO $ RDF4H.writeRdf serializer rdf
 
     logInfoN "Preparing to POST data to SPARQL endpoint"
 
@@ -104,8 +112,8 @@ updateFileContent
   -> URI -- ^URI of agent putting the file
   -> Maybe MediaType
   -> AppM ()
-updateFileContent host fileUri filePath createdByUri maybeMT = do
-  eitherRes <- LD.updateFileContent host fileUri filePath createdByUri maybeMT
+updateFileContent host fileUri filePath uploadedBy maybeMT = do
+  eitherRes <- LD.updateFileContent host fileUri filePath uploadedBy maybeMT
   case eitherRes of
     Left err -> throwError $ FileError err
     Right _ -> pure ()
