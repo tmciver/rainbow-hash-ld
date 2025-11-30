@@ -21,7 +21,6 @@ import           Control.Monad.Catch           (MonadCatch, MonadMask,
 import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
                                                 toLogStr, logInfoN)
 import           Data.RDF                      (RDF, TList)
-import qualified Data.RDF as RDF4H
 import qualified Data.Text                     as T
 import qualified Data.Time.Clock               as Time
 import           System.FilePath               (takeFileName)
@@ -87,8 +86,8 @@ instance MetadataPut AppM where
 
     pure url
 
-  updateFileGraphWithContent host fileUri blobUrl agentUri size time =
-    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri size time
+  updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time =
+    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time
 
 instance MediaTypeDiscover AppM FilePath where
   getMediaType = liftIO . discoverMediaTypeFP
@@ -110,10 +109,11 @@ updateFileContent
   -> URI -- ^URI of File object to be updated
   -> FilePath   -- ^File content
   -> URI -- ^URI of agent putting the file
+  -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
   -> Maybe MediaType
   -> AppM ()
-updateFileContent host fileUri filePath uploadedBy maybeMT = do
-  eitherRes <- LD.updateFileContent host fileUri filePath uploadedBy maybeMT
+updateFileContent host fileUri filePath uploadedBy maybeOnBehalfOf maybeMT = do
+  eitherRes <- LD.updateFileContent host fileUri filePath uploadedBy maybeOnBehalfOf maybeMT
   case eitherRes of
     Left err -> throwError $ FileError err
     Right _ -> pure ()

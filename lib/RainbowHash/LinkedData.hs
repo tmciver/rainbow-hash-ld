@@ -24,7 +24,7 @@ import           Data.Time.Clock      (UTCTime)
 import           Network.HTTP.Media   (MediaType, renderHeader)
 import           Text.URI             (URI, render)
 
-import           RainbowHash.File     (File, fileMediaType, fileContent)
+import           RainbowHash.File     (File(fileName), fileMediaType, fileContent)
 
 data FileNodeCreateOption
   = AlwaysCreate
@@ -70,6 +70,8 @@ class Monad m => MetadataPut m where
     -> URI -- ^File object URI
     -> URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
+    -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
+    -> Maybe Text -- ^file name
     -> Integer    -- ^file size
     -> UTCTime -- ^file creation time
     -> m ()
@@ -166,9 +168,10 @@ updateFileContent
   -> URI -- ^URI of File object to be updated
   -> v   -- ^File content
   -> URI -- ^URI of agent putting the file
+  -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
   -> Maybe MediaType
   -> m (Either FileError ())
-updateFileContent host fileUri v createdByUri maybeMT = do
+updateFileContent host fileUri v createdByUri maybeOnBehalfOf maybeMT = do
   logInfoN $ "Updating file " <> render fileUri
 
   -- Get the file object for the given fle URI
@@ -202,7 +205,7 @@ updateFileContent host fileUri v createdByUri maybeMT = do
           if blobUrl /= fileContent file
             then do
               logInfoN $ "Added file to store at URL " <> render blobUrl
-              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri size t
+              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri maybeOnBehalfOf (fileName file) size t
             else
               Right <$> (logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged")
 

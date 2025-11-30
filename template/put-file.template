@@ -15,11 +15,28 @@ INSERT
                     fo:contentUrl <{{fileContentUrl}}> ;
                     fo:size "{{size}}"^^xsd:integer ;
                     dct:created "{{creationTime}}"^^xsd:dateTime ;
-                    fo:previousRevision ?oldFileDataUri .
+                    dct:creator <{{creatorUri}}> ;
+                    fo:previousRevision ?oldFileDataUri ;
+                    prov:wasGeneratedBy _:a .
 
   <{{fileUri}}> fo:fileData <{{fileDataUri}}> ;
                 fo:size "{{size}}"^^xsd:integer ;
                 dct:modified "{{creationTime}}"^^xsd:dateTime .
+
+  {{! Upload activity }}
+  _:a a prov:Activity ;
+      rdfs:label {{activityTitle}} ;
+      prov:startedAtTime "{{creationTime}}"^^xsd:dateTime ;
+      prov:endedAtTime "{{creationTime}}"^^xsd:dateTime ;
+      prov:wasAssociatedWith <{{creatorUri}}> .
+
+  {{! Delegation }}
+  {{#hasDelegate}}
+  _:b a prov:Delegation ;
+      rdfs:label {{delegationTitle}} ;
+      prov:agent {{onBehalfOf}} ;
+      prov:hadActivity _:a .
+  {{/hasDelegate}}
 }
 WHERE
 {

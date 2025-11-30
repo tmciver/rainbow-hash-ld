@@ -11,8 +11,7 @@ import           Protolude
 import qualified Data.Map                 as Map
 import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
                                            RDF, Rdf, lnode, mkRdf, plainL,
-                                           triple, typedL, unode, bnode, Node(BNode))
-import Data.Maybe (fromJust)
+                                           triple, typedL, unode, Node(BNode))
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as TE
 import           Data.Time.Clock          (UTCTime)
@@ -132,7 +131,7 @@ fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitl
         , triple uploadActivityNode (unode "prov:endedAtTime") (lnode (typedL timeISO8601 "xsd:dateTime"))
         , triple uploadActivityNode (unode "prov:wasAssociatedWith") (unode $ render ownerUri)
 
-        
+        , triple fileDataUriNode (unode "prov:wasGeneratedBy") uploadActivityNode
 
         , triple fileUriNode (unode "rdf:type") (unode "prov:Entity")
         , triple fileUriNode (unode "prov:wasAttributedTo") (unode $ render ownerUri)
