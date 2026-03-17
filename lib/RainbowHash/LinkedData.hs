@@ -24,7 +24,7 @@ import           Data.Time.Clock      (UTCTime)
 import           Network.HTTP.Media   (MediaType, renderHeader)
 import           Text.URI             (URI, render)
 
-import           RainbowHash.File     (File, fileMediaType, fileContent)
+import           RainbowHash.File     (File(fileName), fileMediaType, fileContent)
 
 data FileNodeCreateOption
   = AlwaysCreate
@@ -56,6 +56,7 @@ class Monad m => MetadataPut m where
     :: Text -- ^Hostname from HTTP request
     -> URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
+    -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
     -> Maybe Text -- ^file name. May be unavailable if client calls putFile on ByteString.
     -> Integer    -- ^file size
     -> Maybe Text -- ^title
@@ -69,6 +70,8 @@ class Monad m => MetadataPut m where
     -> URI -- ^File object URI
     -> URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
+    -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
+    -> Maybe Text -- ^file name
     -> Integer    -- ^file size
     -> UTCTime -- ^file creation time
     -> m ()
@@ -105,7 +108,7 @@ putFile
   -> Maybe MediaType
   -> FileNodeCreateOption
   -> m URI
-putFile v host createdByUri _maybeAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
+putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
 
   logInfoN $ "Adding file "
     <> fromMaybe "<unnamed>" (maybeFileName <&> \fn -> "\"" <> fn <> "\"")
@@ -137,7 +140,7 @@ putFile v host createdByUri _maybeAuthorUri maybeFileName maybeTitle maybeDesc m
   case fileNodeCreateOption of
     AlwaysCreate -> do
       logInfoN "User requested creation of a new file node (even if one already exists)."
-      putFileMetadata host blobUrl createdByUri maybeFileName' size maybeTitle maybeDesc t mt
+      putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
       >>= logPutFile blobUrl t mt
     CreateIfNotExists -> do
       maybeFileUrl <- getFileForContent blobUrl
@@ -148,7 +151,7 @@ putFile v host createdByUri _maybeAuthorUri maybeFileName maybeTitle maybeDesc m
           pure fileUrl'
         Nothing -> do
           logInfoN "No file object exists for this content; creating a new file object."
-          putFileMetadata host blobUrl createdByUri maybeFileName' size maybeTitle maybeDesc t mt
+          putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
           >>= logPutFile blobUrl t mt
 
 updateFileContent
@@ -165,9 +168,10 @@ updateFileContent
   -> URI -- ^URI of File object to be updated
   -> v   -- ^File content
   -> URI -- ^URI of agent putting the file
+  -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
   -> Maybe MediaType
   -> m (Either FileError ())
-updateFileContent host fileUri v createdByUri maybeMT = do
+updateFileContent host fileUri v createdByUri maybeOnBehalfOf maybeMT = do
   logInfoN $ "Updating file " <> render fileUri
 
   -- Get the file object for the given fle URI
@@ -201,7 +205,7 @@ updateFileContent host fileUri v createdByUri maybeMT = do
           if blobUrl /= fileContent file
             then do
               logInfoN $ "Added file to store at URL " <> render blobUrl
-              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri size t
+              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri maybeOnBehalfOf (fileName file) size t
             else
               Right <$> (logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged")
 

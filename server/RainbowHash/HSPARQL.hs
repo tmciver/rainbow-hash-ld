@@ -375,15 +375,18 @@ updateFileGraphWithContent
     -> URI -- ^File object URI
     -> URI -- ^URI of file data in blob storage
     -> URI -- ^URI of agent creating the file
+    -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
+    -> Maybe Text -- ^file name
     -> Integer    -- ^file size
     -> UTCTime -- ^file creation time
     -> m ()
-updateFileGraphWithContent host fileUri blobUrl agentUri size time = do
+updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf mFileName size time = do
   let baseUrlText = "http://" <> host
+      fileTitle = fromMaybe "" mFileName
   fileDataId <- liftIO nextRandom
   fileDataUri <- mkURI' $ baseUrlText <> "/file-data/" <> toText fileDataId
 
-  let pfd = PutFileData fileUri fileDataUri blobUrl agentUri size time
+  let pfd = PutFileData fileUri fileDataUri blobUrl fileTitle agentUri onBehalfOf size time
   renderPutFileTemplate pfd >>= logSparql >>= sparqlUpdate
   where logSparql :: MonadLogger m => Text -> m Text
         logSparql t = logDebugN t >> pure t
@@ -392,17 +395,35 @@ data PutFileData = PutFileData
   { fileUri :: URI
   , fileDataUri :: URI
   , fileContentUrl :: URI
-  , agentUri :: URI
+  , fileTitle :: Text
+  , creatorUri :: URI
+  , onBehalfOf :: Maybe URI
   , fileSize :: Integer
   , creationTime :: UTCTime
   }
 
 instance ToMustache PutFileData where
-  toMustache PutFileData{..} = object
+  toMustache PutFileData{..} =
+    let activityTitle :: Text
+        activityTitle = "Modify activity" <>
+          if T.null fileTitle
+          then ""
+          else " for '" <> fileTitle <> "'"
+        delegationTitle :: Text
+        delegationTitle = "Delegation for upload" <>
+          if T.null fileTitle
+          then ""
+          else " for '" <> fileTitle <> "'"
+    in object
     [ "fileUri" ~> render fileUri
     , "fileDataUri" ~> render fileDataUri
     , "fileContentUrl" ~> render fileContentUrl
-    , "agentUri" ~> render agentUri
+    , "fileTitle" ~> fileTitle
+    , "creatorUri" ~> render creatorUri
+    , "onBehalfOf" ~> (render <$> onBehalfOf)
+    , "hasDelegate" ~> isJust onBehalfOf
+    , "delegationTitle" ~> delegationTitle
+    , "activityTitle" ~> activityTitle
     , "size" ~> fileSize
     , "creationTime" ~= creationTime
     ]

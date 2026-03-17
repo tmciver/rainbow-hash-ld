@@ -66,10 +66,17 @@ instance FilePut AppM FilePath where
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
 instance MetadataPut AppM where
-  putFileMetadata host blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt = do
+  putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc time mt = do
     logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl createdByUri maybeFileName size maybeTitle maybeDesc time mt
+    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc time mt
+
+    -- Debug: print the RDF graph
+    -- Why TF do I need to pull out the PrefixMappings and Base URL?
+    -- let pm = RDF4H.prefixMappings rdf
+    --     base = RDF4H.unBaseUrl <$> RDF4H.baseUrl rdf
+    --     serializer = RDF4H.TurtleSerializer base pm
+    -- liftIO $ RDF4H.writeRdf serializer rdf
 
     logInfoN "Preparing to POST data to SPARQL endpoint"
 
@@ -79,8 +86,8 @@ instance MetadataPut AppM where
 
     pure url
 
-  updateFileGraphWithContent host fileUri blobUrl agentUri size time =
-    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri size time
+  updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time =
+    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time
 
 instance MediaTypeDiscover AppM FilePath where
   getMediaType = liftIO . discoverMediaTypeFP
@@ -102,10 +109,11 @@ updateFileContent
   -> URI -- ^URI of File object to be updated
   -> FilePath   -- ^File content
   -> URI -- ^URI of agent putting the file
+  -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
   -> Maybe MediaType
   -> AppM ()
-updateFileContent host fileUri filePath createdByUri maybeMT = do
-  eitherRes <- LD.updateFileContent host fileUri filePath createdByUri maybeMT
+updateFileContent host fileUri filePath uploadedBy maybeOnBehalfOf maybeMT = do
+  eitherRes <- LD.updateFileContent host fileUri filePath uploadedBy maybeOnBehalfOf maybeMT
   case eitherRes of
     Left err -> throwError $ FileError err
     Right _ -> pure ()

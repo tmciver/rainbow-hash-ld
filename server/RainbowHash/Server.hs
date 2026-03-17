@@ -45,11 +45,13 @@ type FilesAPI =
            -- it responds with a redirect;
            -- programmatic clients should use the below PUT endpoint
            Header "Host" Text
+        :> Header "From" Text
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PostNoContent
       :<|>
            Header "Host" Text
+        :> Header "From" Text
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PutNoContent
@@ -86,15 +88,30 @@ getFileHandler config _ mHost fileId =
         Right Nothing     -> throwError err404
         Right (Just file) -> pure $ File file
 
+webIdFromEmail :: EmailAddress -> Config -> Maybe URI
+webIdFromEmail email = Map.lookup email . webIdMap
+
+getWebIdForEmail :: Config -> EmailAddress -> Handler (Maybe URI)
+getWebIdForEmail config' email = do
+  case webIdFromEmail email config' of
+    Nothing -> do
+      let msg = "No WebId associated with email address " <> getEmailAddress email
+      liftIO $ writeLog LevelError msg
+      throwError err500 { errBody = LBS.fromStrict $ encodeUtf8 msg }
+    Just authorUri -> do
+      liftIO $ writeLog LevelInfo $ "Found WebID " <> render authorUri <> " associated with email " <> getEmailAddress email
+      pure $ Just authorUri
+
 updateFileHandler
   :: (URI -> Handler a)
   -> Config
   -> User
-  -> Maybe Text
+  -> Maybe Text -- ^Host header
+  -> Maybe Text -- ^From header
   -> Text
   -> MultipartData Tmp
   -> Handler NoContent
-updateFileHandler response config user mHost fileId multipartData =
+updateFileHandler response config user mHost mFrom fileId multipartData =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "http://" <> host <> "/file/" <> fileId
@@ -107,7 +124,11 @@ updateFileHandler response config user mHost fileId multipartData =
           let filePath = fdPayload fileData
               mMediaType :: Maybe MediaType
               mMediaType = Nothing
-          eitherRes <- liftIO $ runApp (App.updateFileContent host fileUri filePath (userWebId user) mMediaType) config
+
+          -- See if there's an on-behalf-of user
+          mOnBehalfOf <- maybe (pure Nothing) (getWebIdForEmail config) (mFrom <&> EmailAddress)
+
+          eitherRes <- liftIO $ runApp (App.updateFileContent host fileUri filePath (userWebId user) mOnBehalfOf mMediaType) config
           void $ case eitherRes of
             -- TODO: dispatch on AppError values to determine what error to throw.
             Left appError -> throwError (err400 { errBody = errToLBS appError })
@@ -119,6 +140,7 @@ postFileHandler
   :: Config
   -> User
   -> Maybe Text
+  -> Maybe Text -- ^From header
   -> Text
   -> MultipartData Tmp
   -> Handler NoContent
@@ -129,7 +151,8 @@ postFileHandler =
 putFileHandler
   :: Config
   -> User
-  -> Maybe Text
+  -> Maybe Text -- ^Host header
+  -> Maybe Text -- ^From header
   -> Text
   -> MultipartData Tmp
   -> Handler NoContent
@@ -150,21 +173,7 @@ filesHandler config user mHost mFrom multipartData = do
     (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
-  where webIdFromEmail :: EmailAddress -> Config -> Maybe URI
-        webIdFromEmail email = Map.lookup email . webIdMap
-
-        getWebIdForEmail :: Config -> EmailAddress -> Handler (Maybe URI)
-        getWebIdForEmail config' email = do
-          case webIdFromEmail email config' of
-            Nothing -> do
-              let msg = "No WebId associated with email address " <> getEmailAddress email
-              liftIO $ writeLog LevelError msg
-              throwError err500 { errBody = LBS.fromStrict $ encodeUtf8 msg }
-            Just authorUri -> do
-              liftIO $ writeLog LevelInfo $ "Found WebID " <> render authorUri <> " associated with email " <> getEmailAddress email
-              pure $ Just authorUri
-
-        uploadFile
+  where uploadFile
           :: Text
           -> Maybe Text
           -> FileData Tmp
