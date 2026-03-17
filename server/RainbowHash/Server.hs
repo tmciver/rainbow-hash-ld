@@ -8,8 +8,9 @@ module RainbowHash.Server (app) where
 
 import           Protolude              hiding (Handler)
 
-import           Control.Monad.Logger          (LogLevel(LevelInfo))
+import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
 import qualified Data.ByteString.Lazy   as LBS
+import qualified Data.Map as Map
 import           Network.HTTP.Media     (MediaType)
 import           Servant                hiding (URI)
 import           Servant.Multipart
@@ -26,11 +27,13 @@ import           RainbowHash.User (User, userWebId)
 import           RainbowHash.View.File  (File (..))
 import           RainbowHash.View.Home  (Home (..))
 import           RainbowHash.View.HTML  (HTML)
+import RainbowHash.EmailAddress (EmailAddress(..))
 
 type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
     :<|> "files" :> Header "Host" Text
+                 :> Header "From" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> PostNoContent
     :<|> "file"  :>
@@ -138,20 +141,36 @@ filesHandler
   :: Config
   -> User
   -> Maybe Text
+  -> Maybe Text
   -> MultipartData Tmp
   -> Handler NoContent
-filesHandler config user mHost multipartData = do
+filesHandler config user mHost mFrom multipartData = do
   case (files multipartData, mHost) of
-    ([fileData], Just host) -> uploadFile host fileData (inputs multipartData)
+    ([fileData], Just host) -> uploadFile host mFrom fileData (inputs multipartData)
     (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
-  where uploadFile
+  where webIdFromEmail :: EmailAddress -> Config -> Maybe URI
+        webIdFromEmail email = Map.lookup email . webIdMap
+
+        getWebIdForEmail :: Config -> EmailAddress -> Handler (Maybe URI)
+        getWebIdForEmail config' email = do
+          case webIdFromEmail email config' of
+            Nothing -> do
+              let msg = "No WebId associated with email address " <> getEmailAddress email
+              liftIO $ writeLog LevelError msg
+              throwError err500 { errBody = LBS.fromStrict $ encodeUtf8 msg }
+            Just authorUri -> do
+              liftIO $ writeLog LevelInfo $ "Found WebID " <> render authorUri <> " associated with email " <> getEmailAddress email
+              pure $ Just authorUri
+
+        uploadFile
           :: Text
+          -> Maybe Text
           -> FileData Tmp
           -> [Input]
           -> Handler NoContent
-        uploadFile host' fileData fields = do
+        uploadFile host' mFrom' fileData fields = do
           let filePath = fdPayload fileData
               maybeFileName = Just $ fdFileName fileData
               maybeTitle = getTitle fields
@@ -161,7 +180,10 @@ filesHandler config user mHost multipartData = do
               fileNodeCreateOption :: FileNodeCreateOption
               fileNodeCreateOption = getFileNodeCreationOption fields
 
-          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          -- See if there's an on-behalf-of user
+          mAuthorUri <- maybe (pure Nothing) (getWebIdForEmail config) (mFrom' <&> EmailAddress)
+
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> throwError $ err500 { errBody = errToLBS err }
             Right _ -> throwError err303 { errHeaders = [("Location", "/")] }

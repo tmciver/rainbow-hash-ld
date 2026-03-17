@@ -26,65 +26,113 @@ library:
     - Control.Monad.Error
     - RainbowHash.LinkedData
     - RainbowHash.File
+    - RainbowHash.EmailAddress
   dependencies:
+    - aeson
     - http-media
     - modern-uri
     - monad-logger
     - protolude
     - transformers
 
-executable:
-  main: Main.hs
-  source-dirs: app
-  other-modules:
-    - RainbowHash.App
-    - RainbowHash.Config
-    - RainbowHash.Crypto
-    - RainbowHash.HSPARQL
-    - RainbowHash.HTTPClient
-    - RainbowHash.MediaTypeDiscover
-    - RainbowHash.Options
-    - RainbowHash.Profile
-    - RainbowHash.WebID
-    - RainbowHash.RDF4H
-    - RainbowHash.Servant
-    - RainbowHash.Server
-    - RainbowHash.User
-    - RainbowHash.View.File
-    - RainbowHash.View.HTML
-    - RainbowHash.View.Home
-  dependencies:
+executables:
+  rhld-server:
+    main: Main.hs
+    source-dirs: server
+    other-modules:
+      - RainbowHash.App
+      - RainbowHash.Config
+      - RainbowHash.Crypto
+      - RainbowHash.HSPARQL
+      - RainbowHash.HTTPClient
+      - RainbowHash.MediaTypeDiscover
+      - RainbowHash.Options
+      - RainbowHash.Profile
+      - RainbowHash.WebID
+      - RainbowHash.RDF4H
+      - RainbowHash.Servant
+      - RainbowHash.Server
+      - RainbowHash.User
+      - RainbowHash.View.File
+      - RainbowHash.View.HTML
+      - RainbowHash.View.Home
+    dependencies:
+      - aeson
+      - bytestring
+      - case-insensitive
+      - containers
+      - crypton
+      - crypton-x509
+      - crypton-pem
+      - data-default
+      - directory
+      - exceptions
+      - filepath
+      - hsparql
+      - http-client
+      - http-media
+      - http-types
+      - lucid
+      - magic
+      - modern-uri
+      - monad-logger
+      - mtl
+      - mustache
+      - optparse-applicative
+      - parsec
+      - rainbow-hash
+      - rainbow-hash-ld
+      - random
+      - rdf4h
+      - servant
+      - servant-client
+      - servant-multipart
+      - servant-multipart-client
+      - servant-server
+      - temporary
+      - transformers
+      - uuid
+      - wai
+      - warp
+      - yaml
+
+  rhld:
+    main:                Main.hs
+    source-dirs:
+    - cli
+    - cli/src
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wall
+    dependencies:
+    - rainbow-hash-ld
+    - rainbow-hash
+    - protolude
+    - aeson
     - bytestring
-    - case-insensitive
     - containers
-    - crypton
+    - crypton-connection
     - crypton-x509
-    - crypton-pem
+    - crypton-x509-store
+    - crypton-x509-validation
+    - data-default
+    - directory
     - exceptions
     - filepath
-    - hsparql
+    - fsnotify
     - http-client
-    - http-media
+    - http-client-tls
     - http-types
-    - lucid
-    - magic
+    - lens
     - modern-uri
     - monad-logger
-    - mtl
-    - mustache
     - optparse-applicative
-    - parsec
-    - rainbow-hash
-    - rainbow-hash-ld
-    - random
-    - rdf4h
-    - servant
-    - servant-client
-    - servant-multipart
-    - servant-multipart-client
-    - servant-server
-    - temporary
-    - transformers
-    - uuid
-    - wai
-    - warp
+    - ordered-containers
+    - text
+    - tls
+    - unix
+    - wreq
+    - yaml
+
