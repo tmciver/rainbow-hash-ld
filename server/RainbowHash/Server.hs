@@ -17,11 +17,11 @@ import           Servant.Multipart
 import           Text.URI               (URI, mkURI, render)
 
 import           RainbowHash.Logger            (writeLog)
-import           RainbowHash.App        (AppError, appErrorToString, runApp)
+import           RainbowHash.App        (AppError(FileError), appErrorToString, runApp)
 import qualified RainbowHash.App as App
 import           RainbowHash.Config     (Config (..))
 import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
-                                         getRecentFiles, putFile)
+                                         getRecentFiles, putFile, fileErrorToText)
 import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
 import           RainbowHash.User (User, userWebId)
 import           RainbowHash.View.File  (File (..))
@@ -181,7 +181,10 @@ filesHandler config user mHost mFrom multipartData = do
           -> Handler NoContent
         uploadFile host' mFrom' fileData fields = do
           let filePath = fdPayload fileData
-              maybeFileName = Just $ fdFileName fileData
+              maybeFileName = let fn = fdFileName fileData
+                in if fn == "\"\""
+                   then Nothing
+                   else Just fn
               maybeTitle = getTitle fields
               maybeDesc = getDescription fields
               maybeMT :: Maybe MediaType
@@ -194,7 +197,8 @@ filesHandler config user mHost mFrom multipartData = do
 
           either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
           case either' of
-            Left err  -> throwError $ err500 { errBody = errToLBS err }
+            Left err  -> (liftIO $ writeLog LevelError $ appErrorToString err) >> (throwError $ err500 { errBody = errToLBS err })
+            Right (Left err) -> (liftIO $ writeLog LevelError $ fileErrorToText err) >> (throwError $ err400 { errBody = errToLBS $ FileError err })
             Right _ -> throwError err303 { errHeaders = [("Location", "/")] }
 
         getTitle :: [Input] -> Maybe Text

@@ -38,10 +38,12 @@ data FileNodeCreateOption
 data FileError
   = FileNotFound URI
   | MediaTypeMismatch
+  | EmptyFileError
 
 fileErrorToText :: FileError -> Text
 fileErrorToText (FileNotFound uri) = "File URI <" <> render uri <> "> not found."
 fileErrorToText MediaTypeMismatch = "Media type of new file content does not match existing content."
+fileErrorToText EmptyFileError = "File is empty (zero length)."
 
 class Monad m => FilePut m v where
   putFileInStore :: v -> m URI
@@ -107,7 +109,7 @@ putFile
   -> Maybe Text -- ^description
   -> Maybe MediaType
   -> FileNodeCreateOption
-  -> m URI
+  -> m (Either FileError URI)
 putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
 
   logInfoN $ "Adding file "
@@ -131,28 +133,35 @@ putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc maybeMT
   -- Get the file's size
   size <- getFileSize v
 
-  -- Add file to blob store.
-  blobUrl <- putFileInStore v
+  logInfoN $ "File size: " <> show size
 
-  logInfoN $ "Added file to store at URL " <> render blobUrl
+  -- If an attempt to upload an empty file is made, reject it.
+  if size == 0
+    then pure $ Left EmptyFileError
+    else
+      do
+        -- Add file to blob store.
+        blobUrl <- putFileInStore v
 
-  -- What is done next depends on the value of fileNodeCreateOption
-  case fileNodeCreateOption of
-    AlwaysCreate -> do
-      logInfoN "User requested creation of a new file node (even if one already exists)."
-      putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
-      >>= logPutFile blobUrl t mt
-    CreateIfNotExists -> do
-      maybeFileUrl <- getFileForContent blobUrl
-      case maybeFileUrl of
-        Just fileUrl' -> do
-          logInfoN "File object already exists for this content; returning existing URL."
-          -- TODO: should the title and description be updated to what's given in this request?
-          pure fileUrl'
-        Nothing -> do
-          logInfoN "No file object exists for this content; creating a new file object."
-          putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
-          >>= logPutFile blobUrl t mt
+        logInfoN $ "Added file to store at URL " <> render blobUrl
+
+        -- What is done next depends on the value of fileNodeCreateOption
+        case fileNodeCreateOption of
+          AlwaysCreate -> do
+            logInfoN "User requested creation of a new file node (even if one already exists)."
+            putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
+              >>= logPutFile blobUrl t mt <&> Right
+          CreateIfNotExists -> do
+            maybeFileUrl <- getFileForContent blobUrl
+            case maybeFileUrl of
+              Just fileUrl' -> do
+                logInfoN "File object already exists for this content; returning existing URL."
+                -- TODO: should the title and description be updated to what's given in this request?
+                pure . Right $ fileUrl'
+              Nothing -> do
+                logInfoN "No file object exists for this content; creating a new file object."
+                putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
+                  >>= logPutFile blobUrl t mt <&> Right
 
 updateFileContent
   :: ( FileGet m

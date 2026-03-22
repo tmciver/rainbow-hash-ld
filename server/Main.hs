@@ -20,7 +20,7 @@ configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost') =
   <> "  File store URL: " <> render fileStoreUrl' <> "\n"
   <> "  SPARQL Endpoint: " <> render sparqlEndpoint' <> "\n"
   <> "  Default host: " <> fromMaybe "Not set" defaultHost' <> "\n"
-  <> "   WebID mapping: " <> show webIdMap
+  <> "  WebID mapping: " <> show webIdMap
 
 main :: IO ()
 main = do
