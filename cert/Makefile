@@ -37,11 +37,11 @@ $(CONFIG_FILE):
 	fi
 
 # Generate certificate signing request (CSR)
-$(CSR_FILE): $(PRIVATE_KEY) $(CONFIG_FILE)
+$(CSR_FILE): $(CONFIG_FILE) $(PRIVATE_KEY)
 	openssl req -new -key $(PRIVATE_KEY) -out $(CSR_FILE) -config $(CONFIG_FILE)
 
 # Generate self-signed certificate with SAN
-$(CERT_FILE): $(PRIVATE_KEY) $(CONFIG_FILE)
+$(CERT_FILE): $(CONFIG_FILE) $(PRIVATE_KEY)
 	openssl req -x509 -new -key $(PRIVATE_KEY) -out $(CERT_FILE) \
 		-days $(VALIDITY_DAYS) -config $(CONFIG_FILE) -extensions v3_cert
 
