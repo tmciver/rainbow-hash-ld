@@ -24,47 +24,45 @@ all: $(CERT_FILE)
 
 # Generate private key
 $(PRIVATE_KEY):
-	openssl genpkey -algorithm RSA -out $(PRIVATE_KEY) -pkcs8 -aes256
+	openssl genpkey -algorithm RSA -out $(PRIVATE_KEY) # -pkcs12 -aes256
 	chmod 600 $(PRIVATE_KEY)
 
 # Create OpenSSL configuration file with SAN
 $(CONFIG_FILE):
 	@echo "Creating OpenSSL configuration file..."
-	@cat > $(CONFIG_FILE) << 'EOF'
-[req]
-default_bits = $(KEY_SIZE)
-prompt = no
-distinguished_name = req_distinguished_name
-req_extensions = v3_req
-
-[req_distinguished_name]
-C = $(COUNTRY)
-ST = $(STATE)
-L = $(CITY)
-O = $(ORG)
-OU = $(OU)
-CN = $(DOMAIN)
-emailAddress = $(EMAIL)
-
-[v3_req]
-basicConstraints = CA:FALSE
-keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement
-extendedKeyUsage = clientAuth
-subjectAltName = @alt_names
-
-[v3_cert]
-basicConstraints = CA:FALSE
-keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement
-extendedKeyUsage = clientAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = $(DOMAIN)
-DNS.2 = www.$(DOMAIN)
-IP.1 = $(IP)
-email.1 = $(EMAIL)
-URI.1 = https://$(DOMAIN)/
-EOF
+	@echo "[req]" > $(CONFIG_FILE)
+	@echo "default_bits = $(KEY_SIZE)" >> $(CONFIG_FILE)
+	@echo "prompt = no" >> $(CONFIG_FILE)
+	@echo "distinguished_name = req_distinguished_name" >> $(CONFIG_FILE)
+	@echo "req_extensions = v3_req" >> $(CONFIG_FILE)
+	@echo "" >> $(CONFIG_FILE)
+	@echo "[req_distinguished_name]" >> $(CONFIG_FILE)
+	@echo "C = $(COUNTRY)" >> $(CONFIG_FILE)
+	@echo "ST = $(STATE)" >> $(CONFIG_FILE)
+	@echo "L = $(CITY)" >> $(CONFIG_FILE)
+	@echo "O = $(ORG)" >> $(CONFIG_FILE)
+	@echo "OU = $(OU)" >> $(CONFIG_FILE)
+	@echo "CN = $(DOMAIN)" >> $(CONFIG_FILE)
+	@echo "emailAddress = $(EMAIL)" >> $(CONFIG_FILE)
+	@echo "" >> $(CONFIG_FILE)
+	@echo "[v3_req]" >> $(CONFIG_FILE)
+	@echo "basicConstraints = CA:FALSE" >> $(CONFIG_FILE)
+	@echo "keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement" >> $(CONFIG_FILE)
+	@echo "extendedKeyUsage = clientAuth" >> $(CONFIG_FILE)
+	@echo "subjectAltName = @alt_names" >> $(CONFIG_FILE)
+	@echo "" >> $(CONFIG_FILE)
+	@echo "[v3_cert]" >> $(CONFIG_FILE)
+	@echo "basicConstraints = CA:FALSE" >> $(CONFIG_FILE)
+	@echo "keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement" >> $(CONFIG_FILE)
+	@echo "extendedKeyUsage = clientAuth" >> $(CONFIG_FILE)
+	@echo "subjectAltName = @alt_names" >> $(CONFIG_FILE)
+	@echo "" >> $(CONFIG_FILE)
+	@echo "[alt_names]" >> $(CONFIG_FILE)
+	@echo "DNS.1 = $(DOMAIN)" >> $(CONFIG_FILE)
+	@echo "DNS.2 = www.$(DOMAIN)" >> $(CONFIG_FILE)
+	@echo "IP.1 = $(IP)" >> $(CONFIG_FILE)
+	@echo "email.1 = $(EMAIL)" >> $(CONFIG_FILE)
+	@echo "URI.1 = https://$(DOMAIN)/" >> $(CONFIG_FILE)
 
 # Generate certificate signing request (CSR)
 $(CSR_FILE): $(PRIVATE_KEY) $(CONFIG_FILE)
