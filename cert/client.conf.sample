@@ -1,0 +1,54 @@
+# OpenSSL Configuration File for Client Certificate Generation
+# Copy this file to client.conf (or $(CERT_NAME).conf) and customize as needed
+
+[req]
+default_bits = 2048
+prompt = no
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+
+[req_distinguished_name]
+# Country Name (2 letter code)
+C = US
+# State or Province Name (full name)
+ST = CA
+# Locality Name (city)
+L = San Francisco
+# Organization Name
+O = Example Corp
+# Organizational Unit Name
+OU = IT Department
+# Common Name (domain name or server name)
+CN = localhost
+# Email Address
+emailAddress = user@example.com
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement
+extendedKeyUsage = clientAuth
+subjectAltName = @alt_names
+
+[v3_cert]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement
+extendedKeyUsage = clientAuth
+subjectAltName = @alt_names
+
+[alt_names]
+# DNS Subject Alternative Names
+DNS.1 = localhost
+DNS.2 = www.localhost
+# IP Address Subject Alternative Names
+IP.1 = 127.0.0.1
+# Email Subject Alternative Names
+email.1 = user@example.com
+# URI Subject Alternative Names
+URI.1 = https://localhost/
+
+# Additional SAN entries can be added as needed:
+# DNS.3 = api.localhost
+# DNS.4 = *.localhost
+# IP.2 = ::1
+# email.2 = admin@example.com
+# URI.2 = https://api.localhost/

@@ -27,42 +27,14 @@ $(PRIVATE_KEY):
 	openssl genpkey -algorithm RSA -out $(PRIVATE_KEY) # -pkcs12 -aes256
 	chmod 600 $(PRIVATE_KEY)
 
-# Create OpenSSL configuration file with SAN
+# Check that configuration file exists
 $(CONFIG_FILE):
-	@echo "Creating OpenSSL configuration file..."
-	@echo "[req]" > $(CONFIG_FILE)
-	@echo "default_bits = $(KEY_SIZE)" >> $(CONFIG_FILE)
-	@echo "prompt = no" >> $(CONFIG_FILE)
-	@echo "distinguished_name = req_distinguished_name" >> $(CONFIG_FILE)
-	@echo "req_extensions = v3_req" >> $(CONFIG_FILE)
-	@echo "" >> $(CONFIG_FILE)
-	@echo "[req_distinguished_name]" >> $(CONFIG_FILE)
-	@echo "C = $(COUNTRY)" >> $(CONFIG_FILE)
-	@echo "ST = $(STATE)" >> $(CONFIG_FILE)
-	@echo "L = $(CITY)" >> $(CONFIG_FILE)
-	@echo "O = $(ORG)" >> $(CONFIG_FILE)
-	@echo "OU = $(OU)" >> $(CONFIG_FILE)
-	@echo "CN = $(DOMAIN)" >> $(CONFIG_FILE)
-	@echo "emailAddress = $(EMAIL)" >> $(CONFIG_FILE)
-	@echo "" >> $(CONFIG_FILE)
-	@echo "[v3_req]" >> $(CONFIG_FILE)
-	@echo "basicConstraints = CA:FALSE" >> $(CONFIG_FILE)
-	@echo "keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement" >> $(CONFIG_FILE)
-	@echo "extendedKeyUsage = clientAuth" >> $(CONFIG_FILE)
-	@echo "subjectAltName = @alt_names" >> $(CONFIG_FILE)
-	@echo "" >> $(CONFIG_FILE)
-	@echo "[v3_cert]" >> $(CONFIG_FILE)
-	@echo "basicConstraints = CA:FALSE" >> $(CONFIG_FILE)
-	@echo "keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement" >> $(CONFIG_FILE)
-	@echo "extendedKeyUsage = clientAuth" >> $(CONFIG_FILE)
-	@echo "subjectAltName = @alt_names" >> $(CONFIG_FILE)
-	@echo "" >> $(CONFIG_FILE)
-	@echo "[alt_names]" >> $(CONFIG_FILE)
-	@echo "DNS.1 = $(DOMAIN)" >> $(CONFIG_FILE)
-	@echo "DNS.2 = www.$(DOMAIN)" >> $(CONFIG_FILE)
-	@echo "IP.1 = $(IP)" >> $(CONFIG_FILE)
-	@echo "email.1 = $(EMAIL)" >> $(CONFIG_FILE)
-	@echo "URI.1 = https://$(DOMAIN)/" >> $(CONFIG_FILE)
+	@if [ ! -f $(CONFIG_FILE) ]; then \
+		echo "Error: Configuration file $(CONFIG_FILE) not found."; \
+		echo "Please copy $(CERT_NAME).conf.sample to $(CONFIG_FILE) and customize as needed."; \
+		echo "Run 'make config' to create a default configuration file."; \
+		exit 1; \
+	fi
 
 # Generate certificate signing request (CSR)
 $(CSR_FILE): $(PRIVATE_KEY) $(CONFIG_FILE)
@@ -73,9 +45,21 @@ $(CERT_FILE): $(PRIVATE_KEY) $(CONFIG_FILE)
 	openssl req -x509 -new -key $(PRIVATE_KEY) -out $(CERT_FILE) \
 		-days $(VALIDITY_DAYS) -config $(CONFIG_FILE) -extensions v3_cert
 
+# Create configuration file from sample
+.PHONY: config
+config:
+	@if [ -f $(CONFIG_FILE) ]; then \
+		echo "Configuration file $(CONFIG_FILE) already exists."; \
+		echo "Remove it first if you want to recreate it from the sample."; \
+	else \
+		cp $(CERT_NAME).conf.sample $(CONFIG_FILE); \
+		echo "Created $(CONFIG_FILE) from sample template."; \
+		echo "Please edit $(CONFIG_FILE) to customize certificate details."; \
+	fi
+
 # Generate certificate without password protection (for testing)
 .PHONY: cert-nopass
-cert-nopass:
+cert-nopass: $(CONFIG_FILE)
 	openssl genpkey -algorithm RSA -out $(CERT_NAME)-nopass.key -pkcs8
 	chmod 600 $(CERT_NAME)-nopass.key
 	openssl req -x509 -new -key $(CERT_NAME)-nopass.key -out $(CERT_NAME)-nopass.crt \
@@ -122,10 +106,18 @@ convert: $(CERT_FILE) $(PRIVATE_KEY)
 	openssl pkcs12 -export -out $(CERT_NAME).p12 -inkey $(PRIVATE_KEY) -in $(CERT_FILE) -name "$(CERT_NAME)"
 	openssl x509 -in $(CERT_FILE) -out $(CERT_NAME).pem -outform PEM
 
-# Clean up generated files
+# Clean up generated files (preserve sample config)
 .PHONY: clean
 clean:
-	rm -f *.key *.crt *.csr *.conf *.p12 *.pem
+	rm -f *.key *.crt *.csr *.p12 *.pem
+	@if [ -f $(CONFIG_FILE) ] && [ -f $(CERT_NAME).conf.sample ]; then \
+		echo "Keeping $(CONFIG_FILE) (use 'make clean-config' to remove it)"; \
+	fi
+
+# Clean configuration file
+.PHONY: clean-config
+clean-config:
+	rm -f $(CONFIG_FILE)
 
 # Clean everything including backup files
 .PHONY: distclean
@@ -139,12 +131,14 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  all         - Generate private key and self-signed certificate (default)"
+	@echo "  config      - Create configuration file from sample template"
 	@echo "  cert-nopass - Generate certificate without password protection"
 	@echo "  verify      - Verify and display certificate information"
 	@echo "  info        - Show certificate subject, issuer, validity, and SAN"
 	@echo "  test        - Test that certificate and private key match"
 	@echo "  convert     - Convert to PKCS#12 and PEM formats"
-	@echo "  clean       - Remove generated certificate files"
+	@echo "  clean       - Remove generated certificate files (keep config)"
+	@echo "  clean-config- Remove configuration file"
 	@echo "  distclean   - Remove all generated and backup files"
 	@echo "  help        - Show this help message"
 	@echo ""
@@ -161,7 +155,13 @@ help:
 	@echo "  ORG           - Organization (default: Example Corp)"
 	@echo "  OU            - Organizational Unit (default: IT Department)"
 	@echo ""
+	@echo "Getting started:"
+	@echo "  1. Run 'make config' to create configuration file from template"
+	@echo "  2. Edit $(CERT_NAME).conf to customize certificate details"
+	@echo "  3. Run 'make all' to generate certificate and private key"
+	@echo ""
 	@echo "Example usage:"
-	@echo "  make CERT_NAME=mycert DOMAIN=example.com EMAIL=admin@example.com"
-	@echo "  make cert-nopass DOMAIN=testserver.local"
+	@echo "  make config"
+	@echo "  make CERT_NAME=mycert"
+	@echo "  make cert-nopass"
 	@echo "  make verify info"
