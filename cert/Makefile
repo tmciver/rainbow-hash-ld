@@ -86,6 +86,14 @@ info: $(CERT_FILE)
 	@echo "=== Subject Alternative Names ==="
 	openssl x509 -in $(CERT_FILE) -noout -ext subjectAltName
 
+# Show certificate modulus and exponent
+.PHONY: modulus
+modulus: $(CERT_FILE)
+	@echo "=== Certificate Public Key Modulus ==="
+	openssl x509 -in $(CERT_FILE) -noout -modulus
+	@echo "=== Certificate Public Key Exponent ==="
+	openssl x509 -in $(CERT_FILE) -noout -text | grep -A 1 "Exponent:"
+
 # Test certificate and key pair
 .PHONY: test
 test: $(CERT_FILE) $(PRIVATE_KEY)
@@ -141,6 +149,7 @@ help:
 	@echo "  cert-nopass - Generate certificate without password protection"
 	@echo "  verify      - Verify and display certificate information"
 	@echo "  info        - Show certificate subject, issuer, validity, and SAN"
+	@echo "  modulus     - Show certificate public key modulus and exponent"
 	@echo "  test        - Test that certificate and private key match"
 	@echo "  pkcs12      - Create PKCS#12 bundle from certificate and key"
 	@echo "  convert     - Convert to PKCS#12 and PEM formats"
