@@ -99,6 +99,12 @@ test: $(CERT_FILE) $(PRIVATE_KEY)
 		exit 1; \
 	fi
 
+# Create PKCS12 bundle
+.PHONY: pkcs12
+pkcs12: $(CERT_FILE) $(PRIVATE_KEY)
+	@echo "Creating PKCS12 bundle..."
+	openssl pkcs12 -export -out $(CERT_NAME).p12 -inkey $(PRIVATE_KEY) -in $(CERT_FILE) -name "$(CERT_NAME)"
+
 # Convert to different formats
 .PHONY: convert
 convert: $(CERT_FILE) $(PRIVATE_KEY)
@@ -136,6 +142,7 @@ help:
 	@echo "  verify      - Verify and display certificate information"
 	@echo "  info        - Show certificate subject, issuer, validity, and SAN"
 	@echo "  test        - Test that certificate and private key match"
+	@echo "  pkcs12      - Create PKCS#12 bundle from certificate and key"
 	@echo "  convert     - Convert to PKCS#12 and PEM formats"
 	@echo "  clean       - Remove generated certificate files (keep config)"
 	@echo "  clean-config- Remove configuration file"
