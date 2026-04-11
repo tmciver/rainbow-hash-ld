@@ -11,20 +11,24 @@ only supported method of building the application.
 To build using Nix, run
 
     $ nix-build
-    
+
 ## Running
 
 Once the application is built, you can run it with
 
-    $ ./result/bin/rainbow-hash-ld
-    
-Todo: rename the project and application.
+    $ ./result/bin/rainbow-hash-ld \
+      --file-store-url URL \
+      --sparql-url URL
 
-There are several bits of hard-coded configuration data (these will be made
-configurable in a future release):
+The URL supplied to `--file-store-url` should be a URL to a
+[rainbow-hash](https://github.com/tmciver/rainbow-hash) compatible file store
+and the URL supplied to `--sparql-url` shoulde be a URL to a [SPARQL
+server](https://www.w3.org/TR/sparql11-protocol/) that also supports the [Graph
+Store
+Protocol](https://www.w3.org/TR/sparql11-http-rdf-update/). `rainbow-hash-ld`
+has only been tested using
+[Fuseki](https://jena.apache.org/documentation/fuseki2/).
 
-* Port: 8081
-* Blob storage URL to `rainbow-hash`: http://localhost:3000/blobs
-* SPARQL endpoint URL: http://localhost:3030/ds
+You can also specify a port with `-p` or `--port`. The default port is 80.
 
 Visit the application at http://localhost:8081.
