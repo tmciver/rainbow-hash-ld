@@ -37,12 +37,12 @@ subjectAltName = @alt_names
 
 [alt_names]
 # DNS Subject Alternative Names
-DNS.1 = localhost
-DNS.2 = www.localhost
+#DNS.1 = localhost
+#DNS.2 = www.localhost
 # IP Address Subject Alternative Names
-IP.1 = 127.0.0.1
+#IP.1 = 127.0.0.1
 # Email Subject Alternative Names
-email.1 = user@example.com
+#email.1 = user@example.com
 # URI Subject Alternative Names
 URI.1 = https://localhost/
 
