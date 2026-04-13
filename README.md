@@ -36,19 +36,19 @@ You can also specify a port with `-p` or `--port`. The default port is 80.
 
 Caldron authenticates the client using the [WebID-TLS
 protocol](https://www.w3.org/2005/Incubator/webid/spec/tls/). But instead of
-using TLS-Light service described in the spec, Caldron uses a hacky version that
-uses a proxy with two different virtual hosts configured both of which use
+using a TLS-Light service described in the spec, Caldron uses a hacky version
+that uses a proxy with two different virtual hosts configured both of which use
 https. One virtual host is configured normally - this is the entrypoint to the
 app - the other is configured to request a client certificate.
 
-This proxy is currently required. Once the client certficate is validated, the
-certificate is passed on to the downstream server (this application) in the
-`X-SSL-CERT` header. If you visit the application URL without this proxy in
-place, you will receive an error with the message
+Once the proxy validates the client certficate, the certificate is passed on to
+the downstream server (this application) in the `X-SSL-CERT` header. If you
+visit the application URL without this proxy in place, you will receive an error
+with the message
 
     Missing X-SSL-CERT header
 
-There are plans to [create a TLS-Light
+There are plans to [create a proper TLS-Light
 service](https://github.com/tmciver/rainbow-hash-ld/issues/28) at some point in
 the future.
 
@@ -67,7 +67,7 @@ directory:
 
     $ cd cert
 
-Next, run the following `make` command to create this file:
+Next, run the following `make` command to create the configuration file:
 
     $ make config
 
