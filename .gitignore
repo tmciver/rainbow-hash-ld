@@ -8,3 +8,6 @@ TAGS
 flycheck_*
 *~
 .aider*
+/cert/*.crt
+/cert/*.key
+/cert/*.conf
