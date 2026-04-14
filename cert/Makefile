@@ -113,6 +113,13 @@ pkcs12: $(CERT_FILE) $(PRIVATE_KEY)
 	@echo "Creating PKCS12 bundle..."
 	openssl pkcs12 -export -out $(CERT_NAME).p12 -inkey $(PRIVATE_KEY) -in $(CERT_FILE) -name "$(CERT_NAME)"
 
+# Create combined PEM file with both certificate and private key
+.PHONY: pem
+pem: $(CERT_FILE) $(PRIVATE_KEY)
+	@echo "Creating combined PEM file with certificate and private key..."
+	cat $(CERT_FILE) $(PRIVATE_KEY) > $(CERT_NAME).pem
+	@echo "Combined PEM file created: $(CERT_NAME).pem"
+
 # Convert to different formats
 .PHONY: convert
 convert: $(CERT_FILE) $(PRIVATE_KEY)
@@ -123,7 +130,7 @@ convert: $(CERT_FILE) $(PRIVATE_KEY)
 # Clean up generated files (preserve sample config)
 .PHONY: clean
 clean:
-	rm -f *.key *.crt *.csr *.p12 *.pem
+	rm -f *.key *.crt *.csr *.p12 *.pem *.pem
 	@if [ -f $(CONFIG_FILE) ] && [ -f $(CERT_NAME).conf.sample ]; then \
 		echo "Keeping $(CONFIG_FILE) (use 'make clean-config' to remove it)"; \
 	fi
@@ -152,6 +159,7 @@ help:
 	@echo "  modulus     - Show certificate public key modulus and exponent"
 	@echo "  test        - Test that certificate and private key match"
 	@echo "  pkcs12      - Create PKCS#12 bundle from certificate and key"
+	@echo "  pem         - Create combined PEM file with certificate and private key"
 	@echo "  convert     - Convert to PKCS#12 and PEM formats"
 	@echo "  clean       - Remove generated certificate files (keep config)"
 	@echo "  clean-config- Remove configuration file"

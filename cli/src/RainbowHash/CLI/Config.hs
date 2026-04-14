@@ -46,8 +46,7 @@ data StoredConfig = StoredConfig
   , scDeleteAction :: DeleteAction
   , scExtensionsToIgnore :: Set Text
   , scEmailMap :: Map Text EmailAddress
-  , scCertPath :: Maybe FilePath
-  , scKeyPath :: Maybe FilePath
+  , scPemPath :: Maybe FilePath
   } deriving (Show)
 
 data Config = Config
@@ -55,8 +54,7 @@ data Config = Config
   , deleteAction :: DeleteAction
   , extensionsToIgnore :: Set Text
   , emailMap :: Map Text EmailAddress
-  , certPath :: FilePath
-  , keyPath :: FilePath
+  , pemPath :: FilePath
   } deriving (Show)
 
 instance ToJSON StoredConfig where
@@ -71,9 +69,8 @@ instance ToJSON StoredConfig where
         deleteObj = [ "delete-uploaded-file" .= toBool scDeleteAction ]
         extensionsObj = [ "extensions-to-ignore" .= scExtensionsToIgnore ]
         emailMapObj = [ "email-webid-map" .= toJSON scEmailMap ]
-        certPathObj = maybe [] (\p -> [ "cert-path" .= p ]) scCertPath
-        keyPathObj = maybe [] (\p -> [ "key-path" .= p ]) scKeyPath
-    in object $ serverObj <> deleteObj <> extensionsObj <> emailMapObj <> certPathObj <> keyPathObj
+        pemPathObj = maybe [] (\p -> [ "pem-path" .= p ]) scPemPath
+    in object $ serverObj <> deleteObj <> extensionsObj <> emailMapObj <> pemPathObj
 
 instance FromJSON StoredConfig where
   parseJSON = withObject "StoredConfig" $ \o -> do
@@ -85,8 +82,7 @@ instance FromJSON StoredConfig where
     delete <- o .:? "delete-uploaded-file" .!= False
     scExtensionsToIgnore <- o .:? "extensions-to-ignore" .!= Set.empty
     scEmailMap <- o .:? "email-webid-map" .!= Map.empty
-    scCertPath <- o .:? "cert-path"
-    scKeyPath <- o .:? "key-path"
+    scPemPath <- o .:? "pem-path"
     let scDeleteAction = fromBool delete
     pure StoredConfig {..}
 
@@ -96,8 +92,7 @@ instance Default StoredConfig where
     , scDeleteAction = NoDelete
     , scExtensionsToIgnore = Set.empty
     , scEmailMap = Map.empty
-    , scCertPath = Nothing
-    , scKeyPath = Nothing
+    , scPemPath = Nothing
     }
 
 getURI :: Text -> Natural -> URI

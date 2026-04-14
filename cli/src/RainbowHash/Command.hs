@@ -34,8 +34,7 @@ data Command
 data CommonOptions = CommonOptions
   { coDeleteAfterUpload :: Maybe Bool
   , coServerUri :: Maybe URI
-  , coCertPath :: Maybe FilePath
-  , coKeyPath :: Maybe FilePath
+  , coPemPath :: Maybe FilePath
   } deriving (Show)
 
 data WatchDirOptions = WatchDirOptions
@@ -66,8 +65,7 @@ commonOptionsParser :: Parser CommonOptions
 commonOptionsParser = CommonOptions
   <$> deleteParser
   <*> optional (option uriReader (long "server-uri" <> help "The URI of the rainbow-hash server."))
-  <*> optional (strOption (long "cert-path" <> help "Path to the X509 certificate file."))
-  <*> optional (strOption (long "key-path" <> help "Path to the X509 key file."))
+  <*> optional (strOption (long "pem-path" <> help "Path to the PEM file containing both certificate and private key."))
 
 watchCommand :: Parser Command
 watchCommand = WatchDir <$>
@@ -105,8 +103,7 @@ mkConfig
 mkConfig cmd StoredConfig{..} = do
   let CommonOptions{..} = getCommonOptions cmd
   serverUri <- note "Server URI is not specified." $ coServerUri <|> scServerUri
-  certPath <- note "Certificate path is not specified." $ coCertPath <|> scCertPath
-  keyPath <- note "Key path is not specified." $ coKeyPath <|> scKeyPath
+  pemPath <- note "PEM path is not specified." $ coPemPath <|> scPemPath
   let deleteAction = maybe scDeleteAction fromBool coDeleteAfterUpload
       extensionsToIgnore = scExtensionsToIgnore
       emailMap = scEmailMap

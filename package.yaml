@@ -117,6 +117,7 @@ executables:
     - crypton-x509
     - crypton-x509-store
     - crypton-x509-validation
+    - cryptostore
     - data-default
     - directory
     - exceptions

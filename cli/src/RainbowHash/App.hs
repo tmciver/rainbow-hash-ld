@@ -30,7 +30,7 @@ import System.FSNotify (Event(..), Action, EventIsDirectory(..), withManager, wa
 import System.FilePath ((</>), takeFileName)
 import qualified Data.ByteString as BS
 import           Data.Default (def)
-import           Data.X509 (CertificateChain(..))
+import           Data.X509 (CertificateChain(..), PrivKey)
 import qualified Data.X509 as X509
 import qualified Data.X509.File as X509File
 import Network.Connection (TLSSettings(..))
@@ -48,28 +48,35 @@ newtype App a = App { unApp :: ExceptT AppError (ReaderT Config IO) a }
 runApp :: App a -> Config -> IO (Either AppError a)
 runApp = runReaderT . runExceptT . unApp
 
+-- Helper function to read PEM file and extract certificate chain and private key
+readPemCredentials :: FilePath -> IO (Either Text (CertificateChain, PrivKey))
+readPemCredentials pemPath = do
+  result <- try $ do
+    certs :: [X509.SignedExact X509.Certificate] <- X509File.readSignedObject pemPath
+    [privKey] <- X509File.readKeyFile pemPath -- Assumes one private key in file.
+    let certChain = CertificateChain certs
+    pure (certChain, privKey)
+  case result of
+    Left (e :: SomeException) -> pure $ Left $ "Exception reading PEM file: " <> T.pack (show e)
+    Right res -> pure $ Right res
+
 instance HttpWrite App where
   postFile fp emailAddress = do
     config <- ask
-    let sUri = serverUri config
-        url = renderStr sUri
+    let host = serverUri config
+        url = renderStr host <> "/files"
 
     logInfoN $ "Uploading file at " <> T.pack fp <> " to " <> T.pack url
 
-    Authority{..} <- case uriAuthority sUri of
+    Authority{..} <- case uriAuthority host of
       Left _ -> throwError $ PostError "Configured server URL cannot be a relative URL."
       Right auth -> pure auth
 
-    eCred <- liftIO . try $ do
-      certs :: [X509.SignedExact X509.Certificate] <- X509File.readSignedObject (certPath config)
-      let certChain = CertificateChain certs -- $ map (X509.signedObject . X509.getSigned) certs
-      [privKey] <- X509File.readKeyFile (keyPath config) -- Assumes one private key in file.
-      pure (certChain, privKey)
+    eCred <- liftIO $ readPemCredentials (pemPath config)
 
     managerSettings <- case eCred of
-          Left (e :: SomeException) -> do
-            let errMsg = "Failed to load client certificate: " <> show e
-            logErrorN errMsg
+          Left errMsg -> do
+            logErrorN $ "Failed to load client certificate: " <> errMsg
             throwError $ PostError errMsg
           Right (certChain, privKey) -> do
             let hostname = T.unpack $ unRText authHost
