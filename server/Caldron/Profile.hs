@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts  #-}
 
-module RainbowHash.Profile
+module Caldron.Profile
   ( Profile(..)
   , getProfile
   , ProfileError(..)
@@ -23,8 +23,8 @@ import qualified Data.Text.Read            as T
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Text.URI             (render)
 
-import           RainbowHash.Crypto   (CertificateData (..))
-import           RainbowHash.WebID     (WebID)
+import Caldron.Crypto   (CertificateData (..))
+import Caldron.WebID     (WebID)
 
 data Profile = Profile
   { certData :: NonEmpty CertificateData

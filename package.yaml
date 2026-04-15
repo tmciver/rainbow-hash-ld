@@ -1,11 +1,11 @@
 spec-version: 0.36.0
-name: rainbow-hash-ld
+name: caldron
 version: 0.0.1
-synopsis: A web-based file storage application utilizing linked data
-description: A web-based file storage application utilizing linked data
+synopsis: Caldron - A web-based file storage application utilizing linked data
+description: Caldron - A web-based file storage application utilizing linked data
 author: Tim McIver <tim@timmciver.com>
 maintainer: Tim McIver <tim@timmciver.com>
-github: tmciver/rainbow-hash-ld
+github: tmciver/caldron
 category: Web
 
 ghc-options: -Wall -fno-warn-incomplete-uni-patterns
@@ -24,9 +24,10 @@ library:
   source-dirs: lib
   exposed-modules:
     - Control.Monad.Error
-    - RainbowHash.LinkedData
-    - RainbowHash.File
-    - RainbowHash.EmailAddress
+    - Caldron.LinkedData
+    - Caldron.File
+    - Caldron.EmailAddress
+    - Caldron.Logger
   dependencies:
     - aeson
     - http-media
@@ -36,26 +37,26 @@ library:
     - transformers
 
 executables:
-  rhld-server:
+  caldron-server:
     main: Main.hs
     source-dirs: server
     other-modules:
-      - RainbowHash.App
-      - RainbowHash.Config
-      - RainbowHash.Crypto
-      - RainbowHash.HSPARQL
-      - RainbowHash.HTTPClient
-      - RainbowHash.MediaTypeDiscover
-      - RainbowHash.Options
-      - RainbowHash.Profile
-      - RainbowHash.WebID
-      - RainbowHash.RDF4H
-      - RainbowHash.Servant
-      - RainbowHash.Server
-      - RainbowHash.User
-      - RainbowHash.View.File
-      - RainbowHash.View.HTML
-      - RainbowHash.View.Home
+      - Caldron.App
+      - Caldron.Config
+      - Caldron.Crypto
+      - Caldron.HSPARQL
+      - Caldron.HTTPClient
+      - Caldron.MediaTypeDiscover
+      - Caldron.Options
+      - Caldron.Profile
+      - Caldron.WebID
+      - Caldron.RDF4H
+      - Caldron.Servant
+      - Caldron.Server
+      - Caldron.User
+      - Caldron.View.File
+      - Caldron.View.HTML
+      - Caldron.View.Home
     dependencies:
       - aeson
       - bytestring
@@ -81,7 +82,7 @@ executables:
       - optparse-applicative
       - parsec
       - rainbow-hash
-      - rainbow-hash-ld
+      - caldron
       - random
       - rdf4h
       - servant
@@ -96,7 +97,7 @@ executables:
       - warp
       - yaml
 
-  rhld:
+  caldron:
     main:                Main.hs
     source-dirs:
     - cli
@@ -107,7 +108,7 @@ executables:
     - -with-rtsopts=-N
     - -Wall
     dependencies:
-    - rainbow-hash-ld
+    - caldron
     - rainbow-hash
     - protolude
     - aeson

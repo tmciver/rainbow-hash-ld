@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE FlexibleContexts     #-}
 
-module RainbowHash.Server (app) where
+module Caldron.Server (app) where
 
 import           Protolude              hiding (Handler)
 
@@ -16,18 +16,18 @@ import           Servant                hiding (URI)
 import           Servant.Multipart
 import           Text.URI               (URI, mkURI, render)
 
-import           RainbowHash.Logger            (writeLog)
-import           RainbowHash.App        (AppError(FileError), appErrorToString, runApp)
-import qualified RainbowHash.App as App
-import           RainbowHash.Config     (Config (..))
-import           RainbowHash.LinkedData (FileNodeCreateOption (..), getFile,
+import Caldron.Logger            (writeLog)
+import Caldron.App        (AppError(FileError), appErrorToString, runApp)
+import qualified Caldron.App as App
+import Caldron.Config     (Config (..))
+import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile, fileErrorToText)
-import           RainbowHash.Servant    (WebIDUserAuth, genAuthServerContext)
-import           RainbowHash.User (User, userWebId)
-import           RainbowHash.View.File  (File (..))
-import           RainbowHash.View.Home  (Home (..))
-import           RainbowHash.View.HTML  (HTML)
-import RainbowHash.EmailAddress (EmailAddress(..))
+import Caldron.Servant    (WebIDUserAuth, genAuthServerContext)
+import Caldron.User (User, userWebId)
+import Caldron.View.File  (File (..))
+import Caldron.View.Home  (Home (..))
+import Caldron.View.HTML  (HTML)
+import Caldron.EmailAddress (EmailAddress(..))
 
 type FilesAPI =
   WebIDUserAuth :>

@@ -1,4 +1,4 @@
-module RainbowHash.WebID (WebID) where
+module Caldron.WebID (WebID) where
 
 import           Text.URI                         (URI)
 

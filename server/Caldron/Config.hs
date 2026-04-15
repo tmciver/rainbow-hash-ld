@@ -3,7 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module RainbowHash.Config
+module Caldron.Config
   ( Config(..)
   , StoredConfig(..)
   , getStoredConfig
@@ -21,8 +21,8 @@ import qualified System.Directory as D
 import           System.FilePath ((</>), takeDirectory)
 import           Text.URI (URI, mkURI, render)
 
-import           RainbowHash.EmailAddress (EmailAddress)
-import           RainbowHash.Logger (writeLog)
+import           Caldron.EmailAddress (EmailAddress)
+import           Caldron.Logger (writeLog)
 
 instance ToJSON URI where
   toJSON = toJSON . render

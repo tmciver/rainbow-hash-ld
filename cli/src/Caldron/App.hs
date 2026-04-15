@@ -5,7 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module RainbowHash.App
+module Caldron.App
   ( App
   , runApp
   ) where
@@ -37,10 +37,10 @@ import Network.Connection (TLSSettings(..))
 import qualified Network.HTTP.Client.TLS as TLS
 import Network.TLS (defaultParamsClient, clientHooks, onCertificateRequest, onServerCertificate)
 
-import RainbowHash.CLI.Config (Config(..))
-import RainbowHash.CLI (HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
-import RainbowHash.EmailAddress (getEmailAddress)
-import RainbowHash.Logger (writeLog)
+import Caldron.CLI.Config (Config(..))
+import Caldron.CLI (HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
+import Caldron.EmailAddress (getEmailAddress)
+import Caldron.Logger (writeLog)
 
 newtype App a = App { unApp :: ExceptT AppError (ReaderT Config IO) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadThrow, MonadError AppError)

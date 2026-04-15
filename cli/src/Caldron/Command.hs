@@ -4,7 +4,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module RainbowHash.Command
+module Caldron.Command
   ( Command(..)
   , runCommand
   , options
@@ -18,9 +18,9 @@ import Text.URI (URI)
 import qualified Text.URI as URI
 import qualified Data.Text as T
 
-import RainbowHash.CLI (putFileMoveOnError, watchDirectoryMoveOnError, uploadDirectoryMoveOnError)
-import RainbowHash.CLI.Config (StoredConfig (..), Config (..), fromBool)
-import RainbowHash.App (runApp)
+import Caldron.CLI (putFileMoveOnError, watchDirectoryMoveOnError, uploadDirectoryMoveOnError)
+import Caldron.CLI.Config (StoredConfig (..), Config (..), fromBool)
+import Caldron.App (runApp)
 import System.Directory (doesDirectoryExist)
 
 data Command
@@ -64,7 +64,7 @@ uriReader = eitherReader $ \s -> case URI.mkURI (T.pack s) of
 commonOptionsParser :: Parser CommonOptions
 commonOptionsParser = CommonOptions
   <$> deleteParser
-  <*> optional (option uriReader (long "server-uri" <> help "The URI of the rainbow-hash server."))
+  <*> optional (option uriReader (long "server-uri" <> help "The URI of the caldron server."))
   <*> optional (strOption (long "pem-path" <> help "Path to the PEM file containing both certificate and private key."))
 
 watchCommand :: Parser Command
@@ -88,8 +88,8 @@ commandParser = hsubparser
 options :: ParserInfo Command
 options = info (commandParser <**> helper)
   ( fullDesc
- <> progDesc "A command-line interface for a rainbow-hash server."
- <> header "A header for the CLI for rainbow-hash."
+ <> progDesc "A command-line interface for a caldron server."
+ <> header "A header for the CLI for caldron."
   )
 
 getCommonOptions :: Command -> CommonOptions

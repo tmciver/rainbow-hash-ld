@@ -1,14 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module RainbowHash.View.Home (Home(..)) where
+module Caldron.View.Home (Home(..)) where
 
 import           Protolude             hiding (for_)
 
 import           Lucid
 
-import           RainbowHash.View.File (File (..))
-import RainbowHash.User (User, userName)
+import Caldron.View.File (File (..))
+import Caldron.User (User, userName)
 
 data Home = Home User [File]
 

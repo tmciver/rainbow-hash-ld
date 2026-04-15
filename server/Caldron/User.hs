@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module RainbowHash.User
+module Caldron.User
   ( User
   , UserError(..)
   , userWebId
@@ -21,12 +21,12 @@ import Control.Monad.Logger (MonadLogger, monadLoggerLog, fromLogStr, toLogStr)
 import qualified Data.X509                             as X509
 
 import Control.Monad.Error (mapError)
-import RainbowHash.WebID (WebID)
-import RainbowHash.Profile (getProfile, Profile(..), ProfileError)
-import qualified RainbowHash.Profile as Profile
-import RainbowHash.Crypto (validateCert, CryptoError)
-import qualified RainbowHash.Crypto as Crypto
-import           RainbowHash.Logger            (writeLog)
+import Caldron.WebID (WebID)
+import Caldron.Profile (getProfile, Profile(..), ProfileError)
+import qualified Caldron.Profile as Profile
+import Caldron.Crypto (validateCert, CryptoError)
+import qualified Caldron.Crypto as Crypto
+import Caldron.Logger            (writeLog)
 
 data User = User
   { webId     :: WebID

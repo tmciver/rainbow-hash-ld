@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
 
-module RainbowHash.App
+module Caldron.App
   ( AppM
   , AppError(..)
   , runApp
@@ -26,18 +26,18 @@ import qualified Data.Time.Clock               as Time
 import           System.FilePath               (takeFileName)
 import System.IO (hFileSize)
 
-import           RainbowHash.Config            (Config (..))
-import qualified RainbowHash.HSPARQL           as HSPARQL
-import           RainbowHash.HTTPClient        as HTTPClient (HTTPClientError,
+import Caldron.Config            (Config (..))
+import Caldron.HSPARQL           as HSPARQL
+import Caldron.HTTPClient        as HTTPClient (HTTPClientError,
                                                               httpClientErrorToString,
                                                               mapError,
                                                               postToSPARQL,
                                                               putFile)
-import           RainbowHash.LinkedData hiding (updateFileContent)
-import qualified RainbowHash.LinkedData as LD
-import           RainbowHash.Logger            (writeLog)
-import           RainbowHash.MediaTypeDiscover (discoverMediaTypeFP)
-import           RainbowHash.RDF4H             (fileDataToRDF)
+import Caldron.LinkedData hiding (updateFileContent)
+import qualified Caldron.LinkedData as LD
+import Caldron.Logger            (writeLog)
+import Caldron.MediaTypeDiscover (discoverMediaTypeFP)
+import Caldron.RDF4H             (fileDataToRDF)
 
 data AppError
   = HTTPClientError HTTPClientError

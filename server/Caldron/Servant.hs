@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module RainbowHash.Servant
+module Caldron.Servant
   ( WebIDUserAuth
   , genAuthServerContext
   ) where
@@ -30,9 +30,9 @@ import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
                                                    mkAuthHandler)
 import           Text.URI                         (mkURI)
 
-import RainbowHash.User (User)
-import RainbowHash.WebID (WebID)
-import qualified RainbowHash.User as User
+import Caldron.User (User)
+import Caldron.WebID (WebID)
+import qualified Caldron.User as User
 
 type WebIDUserAuth = AuthProtect "webid-auth"
 type instance AuthServerData WebIDUserAuth = User

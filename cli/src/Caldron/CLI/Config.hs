@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module RainbowHash.CLI.Config
+module Caldron.CLI.Config
   ( StoredConfig(..)
   , Config(..)
   , DeleteAction(..)
@@ -25,8 +25,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Control.Monad.Logger (LogLevel(LevelInfo))
 
-import RainbowHash.EmailAddress (EmailAddress)
-import RainbowHash.Logger (writeLog)
+import Caldron.EmailAddress (EmailAddress)
+import Caldron.Logger (writeLog)
 
 data DeleteAction
   = Delete

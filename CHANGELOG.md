@@ -1,4 +1,4 @@
-# Revision history for rainbow-hash-ld
+# Revision history for Caldron
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

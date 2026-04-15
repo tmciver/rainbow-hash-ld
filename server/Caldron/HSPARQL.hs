@@ -4,7 +4,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module RainbowHash.HSPARQL
+module Caldron.HSPARQL
   ( getRecentFiles
   , getFileForContent
   , getFile
@@ -39,8 +39,8 @@ import Text.Mustache.Render (SubstitutionError)
 import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
-import           RainbowHash.File                (File (..))
-import           RainbowHash.Logger              (writeLog)
+import Caldron.File                (File (..))
+import Caldron.Logger              (writeLog)
 
 data HsparqlError
   = BindingValueError BindingValueError

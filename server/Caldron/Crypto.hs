@@ -5,7 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module RainbowHash.Crypto
+module Caldron.Crypto
   ( CryptoError(..)
   , CryptoApp
   , run
@@ -20,8 +20,8 @@ import Control.Monad.Logger (MonadLogger (..), fromLogStr, toLogStr, logInfoN)
 import qualified Crypto.PubKey.RSA as Crypto
 import qualified Data.X509                             as X509
 
-import qualified RainbowHash.HTTPClient as HTTP
-import           RainbowHash.Logger            (writeLog)
+import qualified Caldron.HTTPClient as HTTP
+import Caldron.Logger            (writeLog)
 
 newtype CryptoApp a = CryptoApp { getExceptT :: ExceptT CryptoError IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError CryptoError)

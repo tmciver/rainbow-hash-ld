@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 
-module RainbowHash.Options
+module Caldron.Options
   ( Options(..)
   , optionsParserInfo
   , optionsToConfig
@@ -14,7 +14,7 @@ import           Numeric.Natural     (Natural)
 import           Options.Applicative (Parser, ReadM, auto, eitherReader, fullDesc, header, help, helper, info, long, metavar, option, progDesc, short, showDefault, strOption, value, ParserInfo)
 import           Text.URI            (URI, mkURI)
 
-import           RainbowHash.Config (Config (..), StoredConfig (..))
+import Caldron.Config (Config (..), StoredConfig (..))
 
 data Options = Options
   { port           :: Natural
@@ -53,7 +53,7 @@ optionsParserInfo =
   info (optionsParser <**> helper)
   ( fullDesc
     <> progDesc "A web-based file storage application utilizing linked data"
-    <> header "rainbow-hash-ld - a linked data file storage application" )
+    <> header "Caldron - a linked data file storage application" )
 
 optionsToConfig
   :: Options

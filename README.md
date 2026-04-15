@@ -19,7 +19,7 @@ behind a proxy. See the note about authentication below.
 
 Once the application is built, you can run it with
 
-    $ ./result/bin/rainbow-hash-ld \
+    $ ./result/bin/caldron-server \
       --file-store-url URL \
       --sparql-url URL
 

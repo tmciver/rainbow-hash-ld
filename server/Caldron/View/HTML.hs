@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module RainbowHash.View.HTML (HTML) where
+module Caldron.View.HTML (HTML) where
 
 import           Protolude
 

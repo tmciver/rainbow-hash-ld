@@ -7,8 +7,8 @@ import Protolude
 
 import Options.Applicative (execParser)
 
-import RainbowHash.Command (runCommand, options)
-import RainbowHash.CLI.Config (getStoredConfig)
+import Caldron.Command (runCommand, options)
+import Caldron.CLI.Config (getStoredConfig)
 
 main :: IO ()
 main = do

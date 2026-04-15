@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module RainbowHash.MediaTypeDiscover
+module Caldron.MediaTypeDiscover
   ( discoverMediaTypeBS
   , discoverMediaTypeFP
   ) where

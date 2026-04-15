@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module RainbowHash.RDF4H
+module Caldron.RDF4H
   ( fileDataToRDF
   ) where
 

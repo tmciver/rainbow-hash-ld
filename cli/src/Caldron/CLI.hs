@@ -6,7 +6,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module RainbowHash.CLI
+module Caldron.CLI
   ( HttpWrite(..)
   , FileSystemRead(..)
   , FileSystemWrite(..)
@@ -26,8 +26,8 @@ import qualified Data.Set.Ordered as OSet
 import Control.Monad.Logger (MonadLogger, logInfoN, logErrorN)
 
 import System.FilePath ((</>), takeDirectory)
-import RainbowHash.CLI.Config (DeleteAction(..))
-import RainbowHash.EmailAddress (EmailAddress(..))
+import Caldron.CLI.Config (DeleteAction(..))
+import Caldron.EmailAddress (EmailAddress(..))
 import qualified Data.Text as T
 
 data AppError

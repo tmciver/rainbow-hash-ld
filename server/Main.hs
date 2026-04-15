@@ -10,9 +10,9 @@ import           Network.Wai.Handler.Warp (run)
 import           Options.Applicative      (execParser)
 import           Text.URI                 (render)
 
-import           RainbowHash.Config       (Config (Config), getStoredConfig)
-import           RainbowHash.Options      (Options (..), optionsParserInfo, optionsToConfig)
-import           RainbowHash.Server       (app)
+import           Caldron.Config       (Config (Config), getStoredConfig)
+import           Caldron.Options      (Options (..), optionsParserInfo, optionsToConfig)
+import           Caldron.Server       (app)
 
 configToText :: Config -> Text
 configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost') =

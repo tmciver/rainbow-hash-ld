@@ -5,7 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module RainbowHash.HTTPClient
+module Caldron.HTTPClient
   ( putFile
   , HTTPApp
   , run

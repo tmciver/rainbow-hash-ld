@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module RainbowHash.View.File (File(..)) where
+module Caldron.View.File (File(..)) where
 
 import           Protolude hiding (for_)
 
@@ -15,7 +15,7 @@ import           Lucid.Base           (makeAttribute)
 import           Network.HTTP.Media   (MediaType, mainType, subType)
 import           Text.URI             (render)
 
-import qualified RainbowHash.File     as RH
+import qualified Caldron.File     as RH
 
 newtype File = File RH.File
 
