@@ -17,11 +17,18 @@ To build using Nix, run
 Note that currently this application cannot be used standalone; it must be
 behind a proxy. See the note about authentication below.
 
+Also note that a SPARQL server and a `rainbow-hash`-compatible file store must
+be configured.
+
 Once the application is built, you can run it with
 
     $ ./result/bin/caldron-server \
       --file-store-url URL \
       --sparql-url URL
+
+Or, just edit and run `run.sh`:
+
+    $ ./run.sh
 
 The URL supplied to `--file-store-url` should be a URL to a
 [rainbow-hash](https://github.com/tmciver/rainbow-hash) compatible file store
