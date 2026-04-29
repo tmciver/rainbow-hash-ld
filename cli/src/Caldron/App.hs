@@ -40,7 +40,7 @@ import Network.TLS (defaultParamsClient, clientHooks, onCertificateRequest, onSe
 import Caldron.CLI.Config (Config(..))
 import Caldron.CLI (HttpWrite(..), FileSystemRead (..), FileSystemWrite (..), DirectoryWatch(..), AppError(..))
 import Caldron.EmailAddress (getEmailAddress)
-import Caldron.Logger (writeLog)
+import RainbowHash.Logger (writeLog)
 
 newtype App a = App { unApp :: ExceptT AppError (ReaderT Config IO) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader Config, MonadThrow, MonadError AppError)

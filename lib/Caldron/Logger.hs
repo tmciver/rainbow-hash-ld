@@ -11,6 +11,8 @@ import Control.Monad.Logger (LogLevel(..))
 import qualified Data.Text.IO as T
 import Data.Time (getCurrentTime, formatTime, defaultTimeLocale)
 
+-- TODO: move some of this implementation to RainbowHash.Logger and then remove this module
+
 -- Simple console logger
 writeLog :: LogLevel -> Text -> IO ()
 writeLog level msg = do

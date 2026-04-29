@@ -22,7 +22,7 @@ import           System.FilePath ((</>), takeDirectory)
 import           Text.URI (URI, mkURI, render)
 
 import           Caldron.EmailAddress (EmailAddress)
-import           Caldron.Logger (writeLog)
+import           RainbowHash.Logger (writeLog)
 
 instance ToJSON URI where
   toJSON = toJSON . render

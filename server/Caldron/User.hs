@@ -26,7 +26,7 @@ import Caldron.Profile (getProfile, Profile(..), ProfileError)
 import qualified Caldron.Profile as Profile
 import Caldron.Crypto (validateCert, CryptoError)
 import qualified Caldron.Crypto as Crypto
-import Caldron.Logger            (writeLog)
+import RainbowHash.Logger            (writeLog)
 
 data User = User
   { webId     :: WebID

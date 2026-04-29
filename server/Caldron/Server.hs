@@ -16,7 +16,7 @@ import           Servant                hiding (URI)
 import           Servant.Multipart
 import           Text.URI               (URI, mkURI, render)
 
-import Caldron.Logger            (writeLog)
+import RainbowHash.Logger            (writeLog)
 import Caldron.App        (AppError(FileError), appErrorToString, runApp)
 import qualified Caldron.App as App
 import Caldron.Config     (Config (..))

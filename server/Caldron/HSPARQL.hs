@@ -40,7 +40,7 @@ import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
 import Caldron.File                (File (..))
-import Caldron.Logger              (writeLog)
+import RainbowHash.Logger              (writeLog)
 
 data HsparqlError
   = BindingValueError BindingValueError

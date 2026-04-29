@@ -18,6 +18,7 @@ import           Text.URI             (URI)
 import           Network.HTTP.Media   (MediaType)
 import           Control.Monad.Catch           (MonadCatch, MonadMask,
                                                 MonadThrow)
+import Control.Monad.Error (mapError)
 import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
                                                 toLogStr, logInfoN)
 import           Data.RDF                      (RDF, TList)
@@ -30,12 +31,11 @@ import Caldron.Config            (Config (..))
 import Caldron.HSPARQL           as HSPARQL
 import Caldron.HTTPClient        as HTTPClient (HTTPClientError,
                                                               httpClientErrorToString,
-                                                              mapError,
                                                               postToSPARQL,
                                                               putFile)
 import Caldron.LinkedData hiding (updateFileContent)
 import qualified Caldron.LinkedData as LD
-import Caldron.Logger            (writeLog)
+import RainbowHash.Logger            (writeLog)
 import Caldron.MediaTypeDiscover (discoverMediaTypeFP)
 import Caldron.RDF4H             (fileDataToRDF)
 

@@ -26,7 +26,7 @@ import qualified Data.Text as T
 import Control.Monad.Logger (LogLevel(LevelInfo))
 
 import Caldron.EmailAddress (EmailAddress)
-import Caldron.Logger (writeLog)
+import RainbowHash.Logger (writeLog)
 
 data DeleteAction
   = Delete

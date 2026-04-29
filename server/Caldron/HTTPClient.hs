@@ -10,7 +10,6 @@ module Caldron.HTTPClient
   , HTTPApp
   , run
   , HTTPClientError(..)
-  , mapError
   , httpClientErrorToString
   , postToSPARQL
   ) where
