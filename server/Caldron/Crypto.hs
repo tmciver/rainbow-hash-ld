@@ -21,7 +21,7 @@ import qualified Crypto.PubKey.RSA as Crypto
 import qualified Data.X509                             as X509
 
 import qualified Caldron.HTTPClient as HTTP
-import Caldron.Logger            (writeLog)
+import RainbowHash.Logger            (writeLog)
 
 newtype CryptoApp a = CryptoApp { getExceptT :: ExceptT CryptoError IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadError CryptoError)
