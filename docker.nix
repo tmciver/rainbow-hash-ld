@@ -5,18 +5,29 @@ let
     sha256 = "1z4ga87qla5300qwib3dnjnkaywwh8y1qqsb8w2mrsrw78k9xmlw";
   }) { config = { allowBroken = true; }; };
 
-  # Import the Caldron application (production build without dev tools)
+  # Just build the binary normally but use a minimal base
   caldron = import ./production.nix;
 
-in pkgs.dockerTools.buildLayeredImage {
+in pkgs.dockerTools.buildImage {
   name = "caldron";
   tag = "latest";
-  maxLayers = 120;
   
-  contents = [
-    caldron
-    pkgs.cacert
-  ];
+  # Use scratch (empty) base image
+  fromImage = null;
+  
+  copyToRoot = pkgs.buildEnv {
+    name = "caldron-env";
+    paths = [
+      caldron
+      pkgs.cacert
+      # Minimal glibc for dynamic linking
+      pkgs.glibc
+      # Minimal shared libraries the binary actually needs
+      pkgs.zlib
+      pkgs.openssl
+    ];
+    pathsToLink = [ "/bin" "/lib" "/etc" ];
+  };
 
   config = {
     Cmd = [ "${caldron}/bin/caldron-server" "--file-store-url" "FILE_STORE_URL" "--sparql-url" "SPARQL_URL" ];
@@ -25,6 +36,7 @@ in pkgs.dockerTools.buildLayeredImage {
     };
     Env = [
       "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      "LD_LIBRARY_PATH=/lib"
     ];
     User = "1000:1000";
   };
