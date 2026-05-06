@@ -16,19 +16,15 @@ let
     #!${pkgs.bash}/bin/bash
     set -e
     
-    # Create directories for static files and config
-    mkdir -p /app/static
-    mkdir -p /app/config
-    
     # Start the Caldron server
-    exec ${caldron}/bin/caldron-server "$@"
+    exec ${caldron}/bin/caldron-server --file-store-url FILE_STORE_URL --sparql-url SPARQL_URL"
   '';
 
 in pkgs.dockerTools.buildImage {
   name = "caldron";
   tag = "latest";
   
-  contents = with pkgs; [
+  copyToRoot = with pkgs; [
     # Include the Haskell application
     caldron
     # Basic utilities
@@ -51,11 +47,5 @@ in pkgs.dockerTools.buildImage {
       "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
     ];
     
-    # Create volume mount points
-    Volumes = {
-      "/app/static" = {};
-      "/app/config" = {};
-      "/app/certs" = {};
-    };
   };
 }

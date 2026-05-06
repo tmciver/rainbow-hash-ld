@@ -1,27 +1,27 @@
 services:
+  caldron:
+    image: caldron:latest
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=INFO
+      - FILE_STORE_URL=http://localhost:3000/blobs
+      - SPARQL_URL=http://fuseki:3030/ds
+
   server:
     image: nginx
-    # ports:
-    #   - "80:80"
-    #   - "443:443"
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
       - ./conf/http/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./static:/usr/share/nginx/html/static
       - ./caldron.timmciver.com.crt:/etc/nginx/ssl/server.crt
       - ./caldron.timmciver.com.key:/etc/nginx/ssl/server.key
-    network_mode: host
+#    network_mode: host
+    depends_on:
+      - caldron
 
-# volumes:
-#   db-data:
-#     driver: flocker
-#     driver_opts:
-#       size: "10GiB"
-
-# configs:
-#   httpd-config:
-#     external: true
-
-# networks:
-#   # The presence of these objects is sufficient to define them
-#   front-tier: {}
-#   back-tier: {}
+  # fuseki:
+  #   image: 
