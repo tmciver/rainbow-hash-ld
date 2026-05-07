@@ -9,7 +9,7 @@ services:
       - FILE_STORE_URL=http://localhost:3000/blobs
       - SPARQL_URL=http://fuseki:3030/ds
 
-  server:
+  proxy:
     image: nginx
     ports:
       - "80:80"
