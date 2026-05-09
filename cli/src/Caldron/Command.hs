@@ -50,11 +50,8 @@ data UploadOptions = UploadOptions
 deleteAfterFlag :: Parser Bool
 deleteAfterFlag = flag' True (long "delete-after-upload" <> short 'd' <> help "Whether to delete the uploaded file")
 
-keepFlag :: Parser Bool
-keepFlag = flag' True (long "keep-after-upload" <> short 'k' <> help "Do not delete a file after upload")
-
 deleteParser :: Parser (Maybe Bool)
-deleteParser = optional $ deleteAfterFlag <|> keepFlag
+deleteParser = optional deleteAfterFlag
 
 uriReader :: ReadM URI
 uriReader = eitherReader $ \s -> case URI.mkURI (T.pack s) of
