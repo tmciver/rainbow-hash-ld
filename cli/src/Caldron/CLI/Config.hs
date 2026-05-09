@@ -68,7 +68,7 @@ instance ToJSON StoredConfig where
             in [ "server" .= object [ "host" .= host, "port" .= port ] ]
         deleteObj = [ "delete-uploaded-file" .= toBool scDeleteAction ]
         extensionsObj = [ "extensions-to-ignore" .= scExtensionsToIgnore ]
-        emailMapObj = [ "email-webid-map" .= toJSON scEmailMap ]
+        emailMapObj = [ "user-email-map" .= toJSON scEmailMap ]
         pemPathObj = maybe [] (\p -> [ "pem-path" .= p ]) scPemPath
     in object $ serverObj <> deleteObj <> extensionsObj <> emailMapObj <> pemPathObj
 
@@ -81,7 +81,7 @@ instance FromJSON StoredConfig where
       pure $ getURI host port
     delete <- o .:? "delete-uploaded-file" .!= False
     scExtensionsToIgnore <- o .:? "extensions-to-ignore" .!= Set.empty
-    scEmailMap <- o .:? "email-webid-map" .!= Map.empty
+    scEmailMap <- o .:? "user-email-map" .!= Map.empty
     scPemPath <- o .:? "pem-path"
     let scDeleteAction = fromBool delete
     pure StoredConfig {..}

@@ -14,17 +14,37 @@ To build using Nix, run
 
 ## Configuration
 
-There are several ways to supply the needed configuration data: a config file,
-environment variables and command line arguments, in order of increasing
-precedence. The following table gives information about configuration data.
+### Server
 
-|Description|Config file name|Environment Variable Name|Command Line Argument Name|Required|Default Value|
+There are several ways to supply the needed configuration data to the server: a
+config file, environment variables and command line arguments, in order of
+increasing precedence. The following table gives information about configuration
+data.
+
+|Description|Config File Field Name|Environment Variable Name|Command Line Argument Name|Required|Default Value|
 |-----------|----------------|-------------------------|--------------------------|--------|-------------|
 |SPARQL URL - a URL to SPARQL server |`sparql-url`|`SPARQL_URL`|`--sparql-url`|Yes|N/A|
 |Blob Store URL - a URL to a rainbow-hash-compatible file store|`file-store-url`|`FILE_STORE_URL`|`--file-store-url`|Yes|N/A|
 |Network Port|N/A|N/A|`--port`,`-p`|No|80|
 |Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`preferred-host`|`PREFERRED_HOST`|`--preferred-host`|No|Value of `HOST` header|
 |Email-to-WebID Map - a mapping of email address to WebID used to implement "on behalf of" functionalilty (see note below)|`webid-map`|N/A|N/A|No|None|
+
+### CLI Tool
+
+The `caldron` CLI app operates using using the following sub-commands:
+
+* `upload <FILE-OR-DIR> <options>`
+* `watch <DIR> <options>`
+
+They both take the same options which can be configured via command line
+arguments and/or a configuration file. The following table gives informaton
+about the configuration data:
+
+|Description|Config File Field Name|Command Line Argument Name|Required|Default Value|
+|-----------|----------------------|--------------------------|--------|-------------|
+|Server URL |`sparql-url`|`--server-uri`|Yes|N/A|
+|Path to Certificate and Key PEM file|`file-store-url`|`--pem-path`|Yes|N/A|
+|Whether to delete the file after upload|`delete-uploaded-file`|`--delete-after-upload`, `-d`|No|false|
 
 ## Running
 
