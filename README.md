@@ -21,10 +21,10 @@ precedence. The following table gives information about configuration data.
 |Description|Config file name|Environment Variable Name|Command Line Argument Name|Required|Default Value|
 |-----------|----------------|-------------------------|--------------------------|--------|-------------|
 |SPARQL URL - a URL to SPARQL server |`sparql-url`|`SPARQL_URL`|`--sparql-url`|Yes|N/A|
-|Blob Store URL - a URL to a rainbow-hash-compatible file store|`file-store-url`|`file_STORE_URL`|`--file-store-url`|Yes|N/A|
+|Blob Store URL - a URL to a rainbow-hash-compatible file store|`file-store-url`|`FILE_STORE_URL`|`--file-store-url`|Yes|N/A|
 |Network Port|N/A|N/A|`--port`,`-p`|No|80|
 |Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`preferred-host`|`PREFERRED_HOST`|`--preferred-host`|No|Value of `HOST` header|
-|Email-to-WebID Map - a mapping of email address to WebID used to implement "on behalf of" functionalilty|`webid-map`|N/A|N/A|No|None|
+|Email-to-WebID Map - a mapping of email address to WebID used to implement "on behalf of" functionalilty (see note below)|`webid-map`|N/A|N/A|No|None|
 
 ## Running
 
@@ -53,7 +53,9 @@ only been tested using [Fuseki](https://jena.apache.org/documentation/fuseki2/).
 
 You can also specify a port with `-p` or `--port`. The default port is 80.
 
-### A Note about Authentication
+## Notes
+
+### Authentication
 
 Caldron authenticates the client using the [WebID-TLS
 protocol](https://www.w3.org/2005/Incubator/webid/spec/tls/). But instead of
@@ -100,3 +102,23 @@ the value for `URI.1` in the `alt_names` section. Once done, run
 
 This will create the file `client.p12` which you can load into your browser's
 certificate store.
+
+### On-Behalf-of
+
+The Caldron CLI tool, `caldron`, can be used to upload files and directories of
+files. You may want to use this tool as a long-running process to watch a
+directory and upload files as they are added to this directory. If these files
+are coming from different users and you'd like to track which user was
+responsible for the file, the WebID of the uploading agent cannot be used for
+this. The on-behalf-of feature allows recording of who the uploading agent is
+uploading the file _on behalf of_.
+
+For this to work the file being uploaded must be owned by the user on behalf of
+whom the agent is doing the uploading. In the `caldron` configuration file add
+an entry to the `user-email-map` field with the form:
+
+    <file-owner-name>: <user-email-address>
+
+The configured email address is sent to the server when uploading the file (via
+the `From` HTTP header) and the server then maps the email address to a WebID
+via it's own configuration.
