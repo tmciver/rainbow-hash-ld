@@ -19,7 +19,7 @@ environment variables and command line arguments, in order of increasing
 precedence. The following table gives information about configuration data.
 
 |Description|Config file name|Environment Variable Name|Command Line Argument Name|Required|Default Value|
-|-----------|----------------|-------------------------|--------------------------|--------|
+|-----------|----------------|-------------------------|--------------------------|--------|-------------|
 |SPARQL URL - a URL to SPARQL server |`sparql-url`|`SPARQL_URL`|`--sparql-url`|Yes|N/A|
 |Blob Store URL - a URL to a rainbow-hash-compatible file store|`file-store-url`|`file_STORE_URL`|`--file-store-url`|Yes|N/A|
 |Network Port|N/A|N/A|`--port`,`-p`|No|80|
