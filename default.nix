@@ -1,6 +1,4 @@
-let
-  pkgs = import (import ./nixpkgs.nix) { config = { allowBroken = true; }; };
-in
+{ pkgs ? import (import ./nixpkgs.nix) { config = { allowBroken = true; }; } }:
 pkgs.haskellPackages.developPackage {
   root = ./.;
 
