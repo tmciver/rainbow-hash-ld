@@ -11,7 +11,7 @@ import           Options.Applicative      (execParser)
 import           Text.URI                 (render)
 
 import           Caldron.Config       (Config (Config), getConfig)
-import           Caldron.Options      (Options (..), optionsParserInfo, optionsToConfig)
+import           Caldron.Options      (Options (..), optionsParserInfo)
 import           Caldron.Server       (app)
 
 configToText :: Config -> Text
@@ -24,10 +24,9 @@ configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost') =
 
 main :: IO ()
 main = do
-  opts@Options{..} <- execParser optionsParserInfo
-  storedConfig <- getConfig configFile
-  let eitherConfig = optionsToConfig opts storedConfig
-      port' = fromIntegral port
+  opts <- execParser optionsParserInfo
+  eitherConfig <- runExceptT $ getConfig opts
+  let port' = fromIntegral $ port opts
   case eitherConfig of
     Left err -> putStrLn err
     Right config -> do

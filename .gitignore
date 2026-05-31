@@ -1,6 +1,7 @@
 result
 /dist
 /dist-newstyle
+/docker
 *.cabal
 TAGS
 .envrc

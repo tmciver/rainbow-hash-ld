@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Caldron.Config
   ( Config(..)
@@ -15,12 +16,15 @@ import           Control.Monad.Logger (LogLevel(LevelInfo))
 import           Data.Aeson (FromJSON(..), ToJSON(..), (.:?), (.!=), (.=), object, withObject, withText)
 import           Data.Default (Default(..))
 import qualified Data.Map as Map
+import Data.String (String)
 import qualified Data.Text as T
 import qualified Data.Yaml as YAML
+import qualified System.Directory as D
 import qualified System.Environment as Env
 import           Text.URI (URI, mkURI, render)
 
 import           Caldron.EmailAddress (EmailAddress)
+import           Caldron.Options (Options (..))
 import           RainbowHash.Logger (writeLog)
 
 instance ToJSON URI where
@@ -77,59 +81,70 @@ resolveConfigFilePath Nothing = do
     Just path -> pure path
     Nothing   -> pure "./config.yaml"
 
-getConfig :: Maybe FilePath -> IO StoredConfig
-getConfig mCLIPath = do
-  configFilePath <- resolveConfigFilePath mCLIPath
-  envConfig <- getConfigFromEnv
-  maybeFileConfig <- getConfigFromFile configFilePath
-  let config = case maybeFileConfig of
-        Just fileConfig -> mergeConfigs envConfig fileConfig
-        Nothing -> envConfig
-  if config == def
-    then do
-      writeLog LevelInfo "No configuration found. Creating default config file."
-      writeStoredConfigToFile configFilePath def
-      pure def
-    else pure config
+lookupEnvURI :: String -> IO (Maybe URI)
+lookupEnvURI envVar = do
+  maybeVal <- Env.lookupEnv envVar
+  case maybeVal of
+    Nothing  -> pure Nothing
+    Just val -> case mkURI (T.pack val) of
+      Left _ -> do
+        writeLog LevelInfo $ "Invalid URI in environment variable " <> T.pack envVar <> ": " <> T.pack val
+        pure Nothing
+      Right uri -> pure (Just uri)
+
+-- | Read the config file at the given path, returning Nothing if the file does
+-- not exist or cannot be parsed.
+readStoredConfig :: MonadIO m => FilePath -> m (Maybe StoredConfig)
+readStoredConfig path = liftIO $ do
+  exists <- D.doesFileExist path
+  if exists
+    then fromRight Nothing <$> YAML.decodeFileEither path
+    else pure Nothing
+
+getBlobStoreUrl
+  :: ( MonadIO m
+     , MonadError Text m
+     )
+  => Options
+  -> Maybe StoredConfig
+  -> m URI
+getBlobStoreUrl Options{fileStoreUrl = mOptUri} mStoredConfig = do
+  mEnvUri <- liftIO $ lookupEnvURI "FILE_STORE_URL"
+  let result = mOptUri
+           <|> mEnvUri
+           <|> (mStoredConfig >>= scBlobStoreUrl)
+  maybe (throwError "Missing blob store URL. Provide with --file-store-url, FILE_STORE_URL env var, or in config file.") pure result
+
+getSparqlEndpoint
+  :: ( MonadIO m
+     , MonadError Text m
+     )
+  => Options
+  -> Maybe StoredConfig
+  -> m URI
+getSparqlEndpoint Options{sparqlEndpoint = mOptUri} mStoredConfig = do
+  mEnvUri <- liftIO $ lookupEnvURI "SPARQL_URL"
+  let result = mOptUri
+           <|> mEnvUri
+           <|> (mStoredConfig >>= scSparqlEndpoint)
+  maybe (throwError "Missing SPARQL endpoint URL. Provide with --sparql-url, SPARQL_URL env var, or in config file.") pure result
+
+getConfig
+  :: ( MonadIO m
+     , MonadError Text m
+     )
+  => Options
+  -> m Config
+getConfig opts = do
+  configPath <- liftIO $ resolveConfigFilePath (configFile opts)
+  mStoredConfig <- readStoredConfig configPath
+  Config
+    <$> getBlobStoreUrl opts mStoredConfig
+    <*> getSparqlEndpoint opts mStoredConfig
+    <*> pure (maybe Map.empty scWebIdMap mStoredConfig)
+    <*> pure (defaultHost opts <|> (mStoredConfig >>= scPreferredHost))
 
 writeStoredConfigToFile :: FilePath -> StoredConfig -> IO ()
 writeStoredConfigToFile configFilePath config = do
   writeLog LevelInfo $ "Writing config to file " <> T.pack configFilePath
   YAML.encodeFile configFilePath config
-
-getConfigFromEnv :: IO StoredConfig
-getConfigFromEnv = do
-  writeLog LevelInfo "Reading configuration from environment variables"
-  blobStoreUrl <- readEnvURI "FILE_STORE_URL"
-  sparqlEndpoint <- readEnvURI "SPARQL_URL"
-  preferredHost <- readEnvText "PREFERRED_HOST"
-  -- Note: WebID map is complex to parse from env vars, keeping file-based for now
-  pure $ StoredConfig blobStoreUrl sparqlEndpoint preferredHost Map.empty
-  where
-    readEnvURI :: [Char] -> IO (Maybe URI)
-    readEnvURI envVar = do
-      maybeVal <- Env.lookupEnv envVar
-      case maybeVal of
-        Nothing -> pure Nothing
-        Just val -> case mkURI (T.pack val) of
-          Left _ -> do
-            writeLog LevelInfo $ "Invalid URI in environment variable " <> T.pack envVar <> ": " <> T.pack val
-            pure Nothing
-          Right uri -> pure (Just uri)
-
-    readEnvText :: [Char] -> IO (Maybe Text)
-    readEnvText envVar = fmap T.pack <$> Env.lookupEnv envVar
-
-mergeConfigs :: StoredConfig -> StoredConfig -> StoredConfig
-mergeConfigs envConfig fileConfig = StoredConfig
-  { scBlobStoreUrl = scBlobStoreUrl envConfig <|> scBlobStoreUrl fileConfig
-  , scSparqlEndpoint = scSparqlEndpoint envConfig <|> scSparqlEndpoint fileConfig
-  , scPreferredHost = scPreferredHost envConfig <|> scPreferredHost fileConfig
-  , scWebIdMap = scWebIdMap fileConfig <> scWebIdMap envConfig  -- env vars take precedence for conflicts
-  }
-
-getConfigFromFile :: FilePath -> IO (Maybe StoredConfig)
-getConfigFromFile configFilePath = do
-  writeLog LevelInfo $ "Looking for configuration in file " <> T.pack configFilePath
-  eitherConfig <- YAML.decodeFileEither configFilePath
-  pure $ fromRight Nothing eitherConfig
