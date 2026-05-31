@@ -25,7 +25,7 @@ configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost') =
 main :: IO ()
 main = do
   opts@Options{..} <- execParser optionsParserInfo
-  storedConfig <- getConfig
+  storedConfig <- getConfig configFile
   let eitherConfig = optionsToConfig opts storedConfig
       port' = fromIntegral port
   case eitherConfig of

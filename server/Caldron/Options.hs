@@ -21,6 +21,7 @@ data Options = Options
   , fileStoreUrl   :: Maybe URI
   , sparqlEndpoint :: Maybe URI
   , defaultHost    :: Maybe Text
+  , configFile     :: Maybe FilePath
   }
 
 optionsParser :: Parser Options
@@ -44,6 +45,11 @@ optionsParser = Options
       ( long "default-host"
      <> help "Hostname to use if Host header is absent."
      <> metavar "HOST" ))
+  <*> optional (strOption
+      ( long "config"
+     <> short 'c'
+     <> help "Path to configuration file."
+     <> metavar "FILE" ))
 
 uri :: ReadM URI
 uri = eitherReader $ first (const "Could not parse URL") . mkURI . toS

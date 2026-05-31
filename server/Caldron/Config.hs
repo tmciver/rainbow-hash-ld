@@ -17,9 +17,7 @@ import           Data.Default (Default(..))
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as YAML
-import qualified System.Directory as D
 import qualified System.Environment as Env
-import           System.FilePath ((</>), takeDirectory)
 import           Text.URI (URI, mkURI, render)
 
 import           Caldron.EmailAddress (EmailAddress)
@@ -71,26 +69,31 @@ data Config = Config
   , preferredHost :: Maybe Text
   }
 
-getConfigFilePath :: IO FilePath
-getConfigFilePath = (</> "server" </> "config.yaml") <$> D.getXdgDirectory D.XdgConfig "caldron"
+resolveConfigFilePath :: Maybe FilePath -> IO FilePath
+resolveConfigFilePath (Just path) = pure path
+resolveConfigFilePath Nothing = do
+  envPath <- Env.lookupEnv "CALDRON_CONFIG"
+  case envPath of
+    Just path -> pure path
+    Nothing   -> pure "./config.yaml"
 
-getConfig :: IO StoredConfig
-getConfig = do
+getConfig :: Maybe FilePath -> IO StoredConfig
+getConfig mCLIPath = do
+  configFilePath <- resolveConfigFilePath mCLIPath
   envConfig <- getConfigFromEnv
-  maybeFileConfig <- getConfigFromFile
+  maybeFileConfig <- getConfigFromFile configFilePath
   let config = case maybeFileConfig of
         Just fileConfig -> mergeConfigs envConfig fileConfig
         Nothing -> envConfig
   if config == def
     then do
       writeLog LevelInfo "No configuration found. Creating default config file."
-      writeStoredConfigToFile def
+      writeStoredConfigToFile configFilePath def
       pure def
     else pure config
 
-writeStoredConfigToFile :: StoredConfig -> IO ()
-writeStoredConfigToFile config = do
-  configFilePath <- getConfigFilePath
+writeStoredConfigToFile :: FilePath -> StoredConfig -> IO ()
+writeStoredConfigToFile configFilePath config = do
   writeLog LevelInfo $ "Writing config to file " <> T.pack configFilePath
   YAML.encodeFile configFilePath config
 
@@ -125,11 +128,8 @@ mergeConfigs envConfig fileConfig = StoredConfig
   , scWebIdMap = scWebIdMap fileConfig <> scWebIdMap envConfig  -- env vars take precedence for conflicts
   }
 
-getConfigFromFile :: IO (Maybe StoredConfig)
-getConfigFromFile = do
-  configFilePath <- getConfigFilePath
+getConfigFromFile :: FilePath -> IO (Maybe StoredConfig)
+getConfigFromFile configFilePath = do
   writeLog LevelInfo $ "Looking for configuration in file " <> T.pack configFilePath
-  let configDir = takeDirectory configFilePath
-  D.createDirectoryIfMissing True configDir
   eitherConfig <- YAML.decodeFileEither configFilePath
   pure $ fromRight Nothing eitherConfig
