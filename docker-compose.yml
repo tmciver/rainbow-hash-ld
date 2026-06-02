@@ -9,6 +9,21 @@ services:
       - FILE_STORE_URL=http://localhost:3000/blobs
       - SPARQL_URL=http://fuseki:3030/ds
 
+  fuseki:
+    image: atomgraph/fuseki:4.7.0
+    user: root # otherwise the fuseki user does not have permissions to the mounted folder which is owner by root
+    expose:
+      - 3030
+    volumes:
+      - ./data/fuseki:/fuseki/databases
+
+  rainbow-hash:
+    image: com.timmciver/rainbow-hash:latest
+    environment:
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data/rainbow-hash:/some/path # FIXME
+
   proxy:
     image: nginx
     ports:
