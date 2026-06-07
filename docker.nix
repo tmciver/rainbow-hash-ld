@@ -7,6 +7,10 @@ pkgs.dockerTools.buildLayeredImage {
   name = "com.timmciver/caldron";
   tag = "latest";
   contents = [ caldron pkgs.cacert pkgs.busybox ];
+  extraCommands = ''
+    mkdir -p tmp
+    chmod 1777 tmp
+  '';
   config = {
     Cmd = [ "/bin/caldron-server" ];
     ExposedPorts = {

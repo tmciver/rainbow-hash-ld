@@ -1,28 +1,34 @@
 services:
   caldron:
     image: com.timmciver/caldron:latest
-    ports:
-      - "8081:8081"
     restart: unless-stopped
     environment:
       - LOG_LEVEL=INFO
-      - FILE_STORE_URL=http://localhost:3000/blobs
+      - FILE_STORE_URL=http://rainbow-hash:3000/blobs
       - SPARQL_URL=http://fuseki:3030/ds
+    depends_on:
+      - rainbow-hash
+      - fuseki
 
   fuseki:
     image: atomgraph/fuseki:4.7.0
     user: root # otherwise the fuseki user does not have permissions to the mounted folder which is owner by root
+    ports:
+      - "3031:3030"
     expose:
       - 3030
     volumes:
       - ./data/fuseki:/fuseki/databases
+      - ./conf/fuseki/config.ttl:/fuseki/config.ttl:ro
+    command: [ "--config", "/fuseki/config.ttl" ]
 
   rainbow-hash:
     image: com.timmciver/rainbow-hash:latest
+    command: ["--storage-dir", "/usr/local/data"]
     environment:
       - LOG_LEVEL=INFO
     volumes:
-      - ./data/rainbow-hash:/some/path # FIXME
+      - ./data/rainbow-hash:/usr/local/data
 
   proxy:
     image: nginx
@@ -34,9 +40,5 @@ services:
       - ./static:/usr/share/nginx/html/static
       - ./caldron.timmciver.com.crt:/etc/nginx/ssl/server.crt
       - ./caldron.timmciver.com.key:/etc/nginx/ssl/server.key
-#    network_mode: host
     depends_on:
       - caldron
-
-  # fuseki:
-  #   image: 

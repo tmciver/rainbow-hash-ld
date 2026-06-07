@@ -6,6 +6,7 @@ module Main where
 
 import           Protolude
 
+import           System.IO                (hSetBuffering, stdout, stderr, BufferMode (LineBuffering))
 import           Network.Wai.Handler.Warp (run)
 import           Options.Applicative      (execParser)
 import           Text.URI                 (render)
@@ -24,6 +25,8 @@ configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost') =
 
 main :: IO ()
 main = do
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stderr LineBuffering
   opts <- execParser optionsParserInfo
   eitherConfig <- runExceptT $ getConfig opts
   let port' = fromIntegral $ port opts
