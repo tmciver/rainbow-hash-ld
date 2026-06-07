@@ -80,7 +80,7 @@ getRecentFiles sparqlEndpoint = do
   -- Log the SPARQL query
   writeLog LevelDebug (pack . createSelectQuery $ recentFilesQuery)
 
-  maybeBvss <- selectQuery (unpack $ render sparqlEndpoint) recentFilesQuery
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint) <> "/query") recentFilesQuery
 
   -- Log the returned binding values
   writeLog LevelDebug (show maybeBvss)
@@ -123,7 +123,7 @@ getFile sparqlEndpoint fileUriToGet = do
   -- Log the SPARQL query
   writeLog LevelDebug (pack . createSelectQuery $ query)
 
-  maybeBvss <- selectQuery (unpack $ render sparqlEndpoint) query
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint) <> "/query") query
 
   -- Log the returned binding values
   writeLog LevelDebug (show maybeBvss)
