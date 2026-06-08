@@ -36,7 +36,7 @@ fileDataToRDF
   -> MediaType
   -> IO (URI, RDF a)
 fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc time mt = do
-  let baseUrlText = "http://" <> host
+  let baseUrlText = "https://" <> host
 
   fileId <- nextRandom
   fileUri <- mkURI $ baseUrlText <> "/file/" <> toText fileId

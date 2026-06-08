@@ -381,7 +381,7 @@ updateFileGraphWithContent
     -> UTCTime -- ^file creation time
     -> m ()
 updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf mFileName size time = do
-  let baseUrlText = "http://" <> host
+  let baseUrlText = "https://" <> host
       fileTitle = fromMaybe "" mFileName
   fileDataId <- liftIO nextRandom
   fileDataUri <- mkURI' $ baseUrlText <> "/file-data/" <> toText fileDataId

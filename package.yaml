@@ -72,6 +72,7 @@ executables:
       - hsparql
       - http-client
       - http-media
+      - http-reverse-proxy
       - http-types
       - lucid
       - magic
@@ -90,6 +91,7 @@ executables:
       - servant-multipart
       - servant-multipart-client
       - servant-server
+      - tagged
       - temporary
       - transformers
       - uuid
