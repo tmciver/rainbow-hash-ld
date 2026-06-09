@@ -102,8 +102,9 @@ instance ToHtml File where
               th_ "Last Modified"
               td_ (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
             tr_ $ do
-              th_ "Subject"
-              td_ $ maybe (pure ()) (\uri -> a_ [href_ (render uri)] (toHtml (render uri))) (RH.fileSubject f)
+              th_ "Subjects"
+              td_ $ forM_ (RH.fileSubjects f) $ \uri ->
+                a_ [href_ (render uri), classes_ ["badge", "badge-pill", "badge-info", "mr-1"]] (toHtml (render uri))
 
         form_
           [ method_ "POST"

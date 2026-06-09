@@ -103,7 +103,7 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, subjectBV] = do
+        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
           fileUri' <- getUri fileUriBV
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
@@ -114,9 +114,8 @@ getRecentFiles sparqlEndpoint = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          maybeSubject <- getUriMaybe subjectBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl maybeSubject
-        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl []
+        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
 
 getFile :: URI -> URI -> IO (Maybe File)
 getFile sparqlEndpoint fileUriToGet = do
@@ -132,14 +131,15 @@ getFile sparqlEndpoint fileUriToGet = do
   pure $ case maybeBvss of
     Nothing -> Nothing
     Just [] -> Nothing
-    Just (bvs:_) -> hush $ toFile fileUriToGet bvs
+    Just rows@(firstRow:_) -> hush $ toFile fileUriToGet rows firstRow
 
   where toFile
           :: MonadError HsparqlError m
           => URI
+          -> [[BindingValue]]
           -> [BindingValue]
           -> m File
-        toFile fileUri' [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, subjectBV] = do
+        toFile fileUri' rows [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, _] = do
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
           maybeTitle <- getPlainLiteralMaybe titleBV
@@ -149,9 +149,11 @@ getFile sparqlEndpoint fileUriToGet = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          maybeSubject <- getUriMaybe subjectBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl maybeSubject
-        toFile _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
+          subjects <- catMaybes <$> mapM subjectFromRow rows
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl subjects
+        toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
+        subjectFromRow [_, _, _, _, _, _, _, _, subjectBV] = getUriMaybe subjectBV
+        subjectFromRow _ = pure Nothing
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
@@ -170,7 +172,6 @@ recentFilesQuery = do
   created <- var
   updated <- var
   contentUrl <- var
-  subject <- var
 
   -- where clause
   triple_ fileIri (fo .:. "fileData") fileDataIri
@@ -182,13 +183,12 @@ recentFilesQuery = do
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
-  optional_ (triple_ fileIri (dct .:. "subject") subject)
 
   orderNextDesc created
 
   limit_ 10
 
-  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl, subject]
+  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
 
 fileQuery :: URI -> Query SelectQuery
 fileQuery fileUri' = do
@@ -220,8 +220,6 @@ fileQuery fileUri' = do
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
   optional_ (triple_ fileIri (dct .:. "subject") subject)
-
-  limit_ 1
 
   selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject]
 

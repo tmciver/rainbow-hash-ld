@@ -55,13 +55,20 @@ instance ToHtml Home where
               (toHtml ("" :: Text))
 
           div_ [class_ "form-group"] $ do
-            label_ [for_ "subject-input"] "Subject (SKOS Concept URL)"
-            input_ [ type_ "url"
-                   , name_ "subject"
-                   , placeholder_ "https://example.com/concepts/my-concept"
-                   , id_ "subject-input"
-                   , class_ "form-control"
-                   ]
+            label_ "Subject (SKOS Concept URLs)"
+            div_ [id_ "subject-pills", classes_ ["mb-2"]] (pure ())
+            div_ [class_ "input-group"] $ do
+              input_ [ type_ "url"
+                     , id_ "subject-url-input"
+                     , class_ "form-control"
+                     , placeholder_ "https://example.com/concepts/my-concept"
+                     ]
+              div_ [class_ "input-group-append"] $
+                button_ [ type_ "button"
+                        , id_ "add-subject-btn"
+                        , class_ "btn btn-secondary"
+                        ] "Add"
+            div_ [id_ "subject-hidden-inputs"] (pure ())
 
           div_ [class_ "form-check"] $ do
             input_ [ type_ "checkbox"
@@ -77,4 +84,42 @@ instance ToHtml Home where
 
         toHtml files
 
+        script_ [type_ "text/javascript"] subjectPillsScript
+
   toHtmlRaw = toHtml
+
+subjectPillsScript :: Text
+subjectPillsScript =
+  "(function() {\
+  \  var urlInput     = document.getElementById('subject-url-input');\
+  \  var addBtn       = document.getElementById('add-subject-btn');\
+  \  var pillsDiv     = document.getElementById('subject-pills');\
+  \  var hiddenDiv    = document.getElementById('subject-hidden-inputs');\
+  \  function addSubject() {\
+  \    var url = urlInput.value.trim();\
+  \    if (!url) return;\
+  \    var pill = document.createElement('span');\
+  \    pill.className = 'badge badge-pill badge-info mr-1 mb-1';\
+  \    pill.style.fontSize = '0.9em';\
+  \    pill.appendChild(document.createTextNode(url + ' '));\
+  \    var hidden = document.createElement('input');\
+  \    hidden.type  = 'hidden';\
+  \    hidden.name  = 'subject';\
+  \    hidden.value = url;\
+  \    var remove = document.createElement('a');\
+  \    remove.href = '#';\
+  \    remove.textContent = '\\xd7';\
+  \    remove.style.color = 'white';\
+  \    remove.addEventListener('click', function(e) {\
+  \      e.preventDefault(); pill.remove(); hidden.remove();\
+  \    });\
+  \    pill.appendChild(remove);\
+  \    pillsDiv.appendChild(pill);\
+  \    hiddenDiv.appendChild(hidden);\
+  \    urlInput.value = '';\
+  \  }\
+  \  addBtn.addEventListener('click', addSubject);\
+  \  urlInput.addEventListener('keydown', function(e) {\
+  \    if (e.key === 'Enter') { e.preventDefault(); addSubject(); }\
+  \  });\
+  \})();"
