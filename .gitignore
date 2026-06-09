@@ -2,6 +2,7 @@ result
 /dist
 /dist-newstyle
 /docker
+/data
 *.cabal
 TAGS
 .envrc
