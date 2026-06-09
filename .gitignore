@@ -1,6 +1,7 @@
 result
 /dist
 /dist-newstyle
+/docker
 *.cabal
 TAGS
 .envrc
@@ -8,6 +9,9 @@ TAGS
 flycheck_*
 *~
 .aider*
-/cert/*.crt
-/cert/*.key
+*.crt
+*.key
+*.p12
+*.pem
+*.log
 /cert/*.conf

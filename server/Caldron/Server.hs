@@ -11,13 +11,24 @@ import           Protolude              hiding (Handler)
 import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
+import           Data.Tagged            (Tagged (..))
+import qualified Data.Text as T
+import           Data.Text.Encoding     (decodeUtf8)
+import qualified Network.HTTP.Client as HC
+import           Network.HTTP.Client    (defaultManagerSettings, newManager,
+                                         parseRequest)
 import           Network.HTTP.Media     (MediaType)
+import           Network.HTTP.ReverseProxy (ProxyDest (..), WaiProxyResponse (..),
+                                            defaultOnExc, waiProxyTo)
+import           Network.HTTP.Types     (status400, status404, status500)
+import           Network.Wai            (Application, responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
 import           Servant                hiding (URI)
 import           Servant.Multipart
 import           Text.URI               (URI, mkURI, render)
 
 import RainbowHash.Logger            (writeLog)
 import Caldron.App        (AppError(FileError), appErrorToString, runApp)
+import qualified Caldron.File as RH
 import qualified Caldron.App as App
 import Caldron.Config     (Config (..))
 import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
@@ -37,7 +48,13 @@ type FilesAPI =
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> PostNoContent
     :<|> "file"  :>
-      (    Header "Host" Text
+      (
+           Header "Host" Text
+        :> Capture "fileId" Text
+        :> "content"
+        :> Raw
+      :<|>
+           Header "Host" Text
         :> Capture "fileId" Text
         :> Get '[HTML] File
       :<|>
@@ -77,7 +94,7 @@ getFileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
 getFileHandler config _ mHost fileId =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
-      uriText = "http://" <> host <> "/file/" <> fileId
+      uriText = "https://" <> host <> "/file/" <> fileId
   in case mkURI uriText of
     Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
     Just fileUri -> do
@@ -114,7 +131,7 @@ updateFileHandler
 updateFileHandler response config user mHost mFrom fileId multipartData =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
-      uriText = "http://" <> host <> "/file/" <> fileId
+      uriText = "https://" <> host <> "/file/" <> fileId
   in case mkURI uriText of
     Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
     Just fileUri -> do
@@ -225,13 +242,41 @@ filesHandler config user mHost mFrom multipartData = do
                 boolToFNCO True  = AlwaysCreate
                 boolToFNCO False = CreateIfNotExists
 
+fileContentHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
+fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
+  let defaultHost = "example.com"
+      host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
+      uriText = "https://" <> host <> "/file/" <> fileId
+  case mkURI uriText of
+    Nothing -> respond $ responseLBS status400 [] "Could not construct a valid URI for file."
+    Just fileUri -> do
+      either' <- runApp (getFile fileUri) config
+      case either' of
+        Left _          -> respond $ responseLBS status500 [] "Error fetching file metadata."
+        Right Nothing   -> respond $ responseLBS status404 [] "File not found."
+        Right (Just rhFile) -> do
+          let contentUrl = T.unpack (render (RH.fileContent rhFile))
+          writeLog LevelInfo $ render (RH.fileContent rhFile)
+          mgr <- newManager defaultManagerSettings
+          httpReq <- parseRequest contentUrl
+          let dest   = ProxyDest (HC.host httpReq) (HC.port httpReq)
+              blob   = HC.path httpReq
+              modReq = req { rawPathInfo    = blob
+                           , pathInfo       = filter (not . T.null) . T.splitOn "/" . decodeUtf8 $ blob
+                           , rawQueryString = ""
+                           , queryString    = []
+                           }
+          waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond
+
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
 server :: Config -> Server FilesAPI
 server config = (\authedUser -> homeHandler config authedUser
                   :<|> filesHandler config authedUser
-                  :<|> (getFileHandler config authedUser
+                  :<|> (fileContentHandler config authedUser
+                        :<|>
+                        getFileHandler config authedUser
                         :<|>
                         -- This handler is for use by the web form used to update a file as
                         -- it responds with a redirect;

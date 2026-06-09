@@ -89,8 +89,8 @@ authHandler = mkAuthHandler handler
     handler req =
       req & requestHeaders
           & Map.fromList
-          & Map.lookup "X-SSL-CERT"
-          & maybeToEither "Missing X-SSL-CERT header"
+          & Map.lookup "X-SSL-Client-Cert"
+          & maybeToEither "Missing X-SSL-Client-Cert header"
           & either throw401 validateUser
 
 -- | The context that will be made available to request handlers. We supply the

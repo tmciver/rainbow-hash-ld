@@ -118,7 +118,7 @@ instance ToHtml File where
           button_ [type_ "submit", classes_ ["btn", "btn-primary"]] (toHtml ("Submit" :: Text))
 
         h2_ "Content"
-        iframe_ [src_ (render . RH.fileContent $ f), width_ "100%", height_ "600"] (toHtml ("" :: Text))
+        iframe_ [src_ (fileContentSrc f), width_ "100%", height_ "600"] (toHtml ("" :: Text))
 
     where showMediaType :: MediaType -> Text
           showMediaType mt = T.decodeUtf8 . CI.original $ mainType mt <> "/" <> subType mt
@@ -127,8 +127,9 @@ instance ToHtml File where
           showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
 
           filePostAction :: RH.File -> Text
-          filePostAction f' =
-            let urlText = render $ RH.fileUri f'
-            in "https" <> T.drop 4 urlText
+          filePostAction = render . RH.fileUri
+
+          fileContentSrc :: RH.File -> Text
+          fileContentSrc f' = render (RH.fileUri f') <> "/content"
 
   toHtmlRaw = toHtml
