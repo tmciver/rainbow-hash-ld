@@ -32,10 +32,11 @@ fileDataToRDF
   -> Integer    -- ^file size
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
+  -> Maybe Text -- ^subject (SKOS Concept URL)
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc time mt = do
+fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc maybeSubject time mt = do
   let baseUrlText = "https://" <> host
 
   fileId <- nextRandom
@@ -121,6 +122,12 @@ fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitl
         -- Title
         case maybeTitle of
           Just title -> [triple fileUriNode (unode "dct:title") (lnode $ plainL title)]
+          Nothing -> []
+        <>
+
+        -- Subject (SKOS Concept)
+        case maybeSubject of
+          Just subjectUrl -> [triple fileUriNode (unode "dct:subject") (unode subjectUrl)]
           Nothing -> []
         <>
 

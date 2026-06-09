@@ -54,6 +54,15 @@ instance ToHtml Home where
               ]
               (toHtml ("" :: Text))
 
+          div_ [class_ "form-group"] $ do
+            label_ [for_ "subject-input"] "Subject (SKOS Concept URL)"
+            input_ [ type_ "url"
+                   , name_ "subject"
+                   , placeholder_ "https://example.com/concepts/my-concept"
+                   , id_ "subject-input"
+                   , class_ "form-control"
+                   ]
+
           div_ [class_ "form-check"] $ do
             input_ [ type_ "checkbox"
                    , name_ "create-new-node"

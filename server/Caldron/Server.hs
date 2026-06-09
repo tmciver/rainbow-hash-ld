@@ -204,6 +204,7 @@ filesHandler config user mHost mFrom multipartData = do
                    else Just fn
               maybeTitle = getTitle fields
               maybeDesc = getDescription fields
+              maybeSubject = getSubject fields
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
@@ -212,7 +213,7 @@ filesHandler config user mHost mFrom multipartData = do
           -- See if there's an on-behalf-of user
           mAuthorUri <- maybe (pure Nothing) (getWebIdForEmail config) (mFrom' <&> EmailAddress)
 
-          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeSubject maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> (liftIO $ writeLog LevelError $ appErrorToString err) >> (throwError $ err500 { errBody = errToLBS err })
             Right (Left err) -> (liftIO $ writeLog LevelError $ fileErrorToText err) >> (throwError $ err400 { errBody = errToLBS $ FileError err })
@@ -227,6 +228,11 @@ filesHandler config user mHost mFrom multipartData = do
         getDescription = (<&> iValue) . find isDescription
           where isDescription :: Input -> Bool
                 isDescription = (== "description") . iName
+
+        getSubject :: [Input] -> Maybe Text
+        getSubject = (<&> iValue) . find isSubject
+          where isSubject :: Input -> Bool
+                isSubject = (== "subject") . iName
 
         getFileNodeCreationOption :: [Input] -> FileNodeCreateOption
         getFileNodeCreationOption = boolToFNCO . maybe False (isEnabled . iValue) . find isFileNodeCreationOption
