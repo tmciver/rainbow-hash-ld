@@ -103,7 +103,7 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, subjectBV] = do
           fileUri' <- getUri fileUriBV
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
@@ -114,8 +114,9 @@ getRecentFiles sparqlEndpoint = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
-        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
+          maybeSubject <- getUriMaybe subjectBV
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl maybeSubject
+        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
 
 getFile :: URI -> URI -> IO (Maybe File)
 getFile sparqlEndpoint fileUriToGet = do
@@ -138,7 +139,7 @@ getFile sparqlEndpoint fileUriToGet = do
           => URI
           -> [BindingValue]
           -> m File
-        toFile fileUri' [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile fileUri' [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, subjectBV] = do
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
           maybeTitle <- getPlainLiteralMaybe titleBV
@@ -148,8 +149,9 @@ getFile sparqlEndpoint fileUriToGet = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
-        toFile _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 8
+          maybeSubject <- getUriMaybe subjectBV
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl maybeSubject
+        toFile _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
@@ -168,6 +170,7 @@ recentFilesQuery = do
   created <- var
   updated <- var
   contentUrl <- var
+  subject <- var
 
   -- where clause
   triple_ fileIri (fo .:. "fileData") fileDataIri
@@ -179,12 +182,13 @@ recentFilesQuery = do
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
+  optional_ (triple_ fileIri (dct .:. "subject") subject)
 
   orderNextDesc created
 
   limit_ 10
 
-  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
+  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl, subject]
 
 fileQuery :: URI -> Query SelectQuery
 fileQuery fileUri' = do
@@ -202,6 +206,7 @@ fileQuery fileUri' = do
   created <- var
   updated <- var
   contentUrl <- var
+  subject <- var
 
   -- where clause
   let fileIri = iriRef (render fileUri')
@@ -214,10 +219,11 @@ fileQuery fileUri' = do
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
+  optional_ (triple_ fileIri (dct .:. "subject") subject)
 
   limit_ 1
 
-  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl]
+  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject]
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do
@@ -285,6 +291,12 @@ getUri
   => BindingValue
   -> m URI
 getUri = parseUnboundAsError parseUri
+
+getUriMaybe
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m (Maybe URI)
+getUriMaybe = sequence . parseBoundNode parseUri
 
 parsePlainLiteralNode
   :: MonadError HsparqlError m

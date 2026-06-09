@@ -101,6 +101,12 @@ instance ToHtml File where
             tr_ $ do
               th_ "Last Modified"
               td_ (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
+            case RH.fileSubject f of
+              Nothing -> pure ()
+              Just subjectUri ->
+                tr_ $ do
+                  th_ "Subject"
+                  td_ $ a_ [href_ (render subjectUri)] (toHtml (render subjectUri))
 
         form_
           [ method_ "POST"
