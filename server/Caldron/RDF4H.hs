@@ -32,7 +32,7 @@ fileDataToRDF
   -> Integer    -- ^file size
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
-  -> Maybe Text -- ^subject (SKOS Concept URL)
+  -> Maybe URI -- ^subject (SKOS Concept)
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
@@ -127,7 +127,7 @@ fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitl
 
         -- Subject (SKOS Concept)
         case maybeSubject of
-          Just subjectUrl -> [triple fileUriNode (unode "dct:subject") (unode subjectUrl)]
+          Just subjectUri -> [triple fileUriNode (unode "dct:subject") (unode $ render subjectUri)]
           Nothing -> []
         <>
 

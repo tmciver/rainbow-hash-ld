@@ -204,7 +204,7 @@ filesHandler config user mHost mFrom multipartData = do
                    else Just fn
               maybeTitle = getTitle fields
               maybeDesc = getDescription fields
-              maybeSubject = getSubject fields
+              maybeSubject = getSubject fields >>= mkURI
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption

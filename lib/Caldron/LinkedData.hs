@@ -63,7 +63,7 @@ class Monad m => MetadataPut m where
     -> Integer    -- ^file size
     -> Maybe Text -- ^title
     -> Maybe Text -- ^description
-    -> Maybe Text -- ^subject (SKOS Concept URL)
+    -> Maybe URI -- ^subject (SKOS Concept)
     -> UTCTime -- ^file creation time
     -> MediaType
     -> m URI
@@ -108,7 +108,7 @@ putFile
   -> Maybe Text -- ^filename
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
-  -> Maybe Text -- ^subject (SKOS Concept URL)
+  -> Maybe URI -- ^subject (SKOS Concept)
   -> Maybe MediaType
   -> FileNodeCreateOption
   -> m (Either FileError URI)
