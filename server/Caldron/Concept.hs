@@ -3,6 +3,7 @@
 
 module Caldron.Concept
   ( Concept (..)
+  , lookupConcept
   , searchConcepts
   ) where
 
@@ -38,6 +39,9 @@ testConcepts = mapMaybe makeConcept
     makeConcept (u, l) = do
       uri <- mkURI u
       pure $ Concept uri l
+
+lookupConcept :: URI -> Maybe Concept
+lookupConcept uri = find ((== render uri) . render . conceptUri) testConcepts
 
 searchConcepts :: Text -> [Concept]
 searchConcepts q =

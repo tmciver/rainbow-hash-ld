@@ -15,6 +15,7 @@ import           Lucid.Base           (makeAttribute)
 import           Network.HTTP.Media   (MediaType, mainType, subType)
 import           Text.URI             (render)
 
+import qualified Caldron.Concept  as Concept
 import qualified Caldron.File     as RH
 
 newtype File = File RH.File
@@ -104,7 +105,8 @@ instance ToHtml File where
             tr_ $ do
               th_ "Subjects"
               td_ $ forM_ (RH.fileSubjects f) $ \uri ->
-                a_ [href_ (render uri), classes_ ["badge", "badge-pill", "badge-info", "mr-1"]] (toHtml (render uri))
+                let label = maybe (render uri) Concept.conceptPrefLabel (Concept.lookupConcept uri)
+                in a_ [href_ (render uri), classes_ ["badge", "badge-pill", "badge-info", "mr-1"]] (toHtml label)
 
         form_
           [ method_ "POST"
