@@ -39,6 +39,8 @@ import Caldron.View.File  (File (..))
 import Caldron.View.Home  (Home (..))
 import Caldron.View.HTML  (HTML)
 import Caldron.EmailAddress (EmailAddress(..))
+import qualified Caldron.Concept as Concept
+import Caldron.Concept (Concept)
 
 type FilesAPI =
   WebIDUserAuth :>
@@ -73,6 +75,7 @@ type FilesAPI =
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PutNoContent
       )
+    :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
   )
   :<|> "static" :> Raw
 
@@ -272,6 +275,9 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
                            }
           waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond
 
+conceptsHandler :: Maybe Text -> Handler [Concept]
+conceptsHandler mQ = pure $ maybe [] Concept.searchConcepts mQ
+
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
@@ -287,7 +293,8 @@ server config = (\authedUser -> homeHandler config authedUser
                         -- PUTs from programmatic clients will use the below PUT handler
                         postFileHandler config authedUser
                         :<|>
-                        putFileHandler config authedUser))
+                        putFileHandler config authedUser)
+                  :<|> conceptsHandler)
                 :<|> staticHandler
 
 app :: Config -> Application

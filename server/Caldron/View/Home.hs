@@ -55,14 +55,20 @@ instance ToHtml Home where
               (toHtml ("" :: Text))
 
           div_ [class_ "form-group"] $ do
-            label_ "Subject (SKOS Concept URLs)"
+            label_ "Subject (SKOS Concepts)"
             div_ [id_ "subject-pills", classes_ ["mb-2"]] (pure ())
             div_ [class_ "input-group"] $ do
-              input_ [ type_ "url"
-                     , id_ "subject-url-input"
-                     , class_ "form-control"
-                     , placeholder_ "https://example.com/concepts/my-concept"
-                     ]
+              div_ [class_ "position-relative", style_ "flex: 1"] $ do
+                input_ [ type_ "text"
+                       , id_ "subject-concept-input"
+                       , class_ "form-control"
+                       , placeholder_ "Search for a concept..."
+                       , autocomplete_ "off"
+                       ]
+                div_ [ id_ "concept-suggestions"
+                     , class_ "list-group"
+                     , style_ "position: absolute; z-index: 1000; width: 100%; display: none"
+                     ] (pure ())
               div_ [class_ "input-group-append"] $
                 button_ [ type_ "button"
                         , id_ "add-subject-btn"
