@@ -211,6 +211,7 @@ filesHandler config user mHost mFrom multipartData = do
               maybeTitle = getTitle fields
               maybeDesc = getDescription fields
               subjects = mapMaybe mkURI $ getSubjects fields
+              newConceptLabels = getNewConceptLabels fields
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
@@ -219,7 +220,16 @@ filesHandler config user mHost mFrom multipartData = do
           -- See if there's an on-behalf-of user
           mAuthorUri <- maybe (pure Nothing) (getWebIdForEmail config) (mFrom' <&> EmailAddress)
 
-          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc subjects maybeMT fileNodeCreateOption) config
+          -- Mint URIs and persist any newly created concepts
+          newConceptUris <- liftIO $ do
+            results <- mapM (HSPARQL.mintAndCreateConcept (sparqlEndpoint config) host') newConceptLabels
+            let (errs, uris) = partitionEithers results
+            forM_ errs $ \err -> writeLog LevelError (HSPARQL.sparqlErrorToText err)
+            pure uris
+
+          let allSubjects = subjects <> newConceptUris
+
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> (liftIO $ writeLog LevelError $ appErrorToString err) >> (throwError $ err500 { errBody = errToLBS err })
             Right (Left err) -> (liftIO $ writeLog LevelError $ fileErrorToText err) >> (throwError $ err400 { errBody = errToLBS $ FileError err })
@@ -237,6 +247,9 @@ filesHandler config user mHost mFrom multipartData = do
 
         getSubjects :: [Input] -> [Text]
         getSubjects = fmap iValue . filter ((== "subject") . iName)
+
+        getNewConceptLabels :: [Input] -> [Text]
+        getNewConceptLabels = fmap iValue . filter ((== "new-concept") . iName)
 
         getFileNodeCreationOption :: [Input] -> FileNodeCreateOption
         getFileNodeCreationOption = boolToFNCO . maybe False (isEnabled . iValue) . find isFileNodeCreationOption

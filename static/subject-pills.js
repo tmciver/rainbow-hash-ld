@@ -7,16 +7,11 @@
 
   var pendingConcept = null; // { uri, label } selected from suggestions
 
-  function addSubjectPill(label, uri) {
+  function makePill(label, colorClass, hidden) {
     var pill = document.createElement('span');
-    pill.className = 'badge badge-pill badge-info mr-1 mb-1';
+    pill.className = 'badge badge-pill ' + colorClass + ' mr-1 mb-1';
     pill.style.fontSize = '0.9em';
     pill.appendChild(document.createTextNode(label + ' '));
-
-    var hidden = document.createElement('input');
-    hidden.type  = 'hidden';
-    hidden.name  = 'subject';
-    hidden.value = uri;
 
     var remove = document.createElement('a');
     remove.href = '#';
@@ -36,9 +31,28 @@
     hideSuggestions();
   }
 
+  function addSubjectPill(label, uri) {
+    var hidden = document.createElement('input');
+    hidden.type  = 'hidden';
+    hidden.name  = 'subject';
+    hidden.value = uri;
+    makePill(label, 'badge-info', hidden);
+  }
+
+  function addNewConceptPill(label) {
+    var hidden = document.createElement('input');
+    hidden.type  = 'hidden';
+    hidden.name  = 'new-concept';
+    hidden.value = label;
+    makePill(label, 'badge-warning', hidden);
+  }
+
   function addSubject() {
     if (pendingConcept) {
       addSubjectPill(pendingConcept.label, pendingConcept.uri);
+    } else {
+      var text = conceptInput.value.trim();
+      if (text) addNewConceptPill(text);
     }
   }
 
@@ -47,12 +61,8 @@
     suggestionsDiv.innerHTML = '';
   }
 
-  function showSuggestions(concepts) {
+  function showSuggestions(concepts, q) {
     suggestionsDiv.innerHTML = '';
-    if (concepts.length === 0) {
-      hideSuggestions();
-      return;
-    }
     concepts.forEach(function(concept) {
       var item = document.createElement('button');
       item.type = 'button';
@@ -67,6 +77,17 @@
       });
       suggestionsDiv.appendChild(item);
     });
+
+    var createItem = document.createElement('button');
+    createItem.type = 'button';
+    createItem.className = 'list-group-item list-group-item-action list-group-item-warning';
+    createItem.textContent = 'Create new: \u201c' + q + '\u201d';
+    createItem.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      addNewConceptPill(q);
+    });
+    suggestionsDiv.appendChild(createItem);
+
     suggestionsDiv.style.display = 'block';
   }
 
@@ -82,7 +103,7 @@
     debounceTimer = setTimeout(function() {
       fetch('/concepts?q=' + encodeURIComponent(q))
         .then(function(r) { return r.json(); })
-        .then(showSuggestions)
+        .then(function(concepts) { showSuggestions(concepts, q); })
         .catch(function() { hideSuggestions(); });
     }, 200);
   });

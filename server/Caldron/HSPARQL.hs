@@ -10,6 +10,7 @@ module Caldron.HSPARQL
   , getFile
   , searchConcepts
   , getConceptsByUris
+  , mintAndCreateConcept
   , updateFileGraphWithContent
   , SparqlError(..)
   , sparqlErrorToText
@@ -259,6 +260,44 @@ getConceptsByUris sparqlEndpoint' uris = do
   let concepts = maybe [] (mapMaybe toConcept) maybeBvss
       uriTexts = map render uris
   pure $ filter ((`elem` uriTexts) . render . conceptUri) concepts
+
+-- | Mint a fresh UUID-based URI for a new SKOS Concept, insert it into the
+-- triple store, and return the minted URI.
+mintAndCreateConcept :: URI -> Text -> Text -> IO (Either SparqlError URI)
+mintAndCreateConcept sparqlEndpoint' host' label = runExceptT $ do
+  conceptId   <- liftIO nextRandom
+  conceptUri' <- maybe (throwError $ MalformedURI "Could not construct concept URI") pure $
+    mkURI $ "https://" <> host' <> "/concepts/" <> toText conceptId
+  let endpointUrl = unpack (render sparqlEndpoint') <> "/update"
+      sparql      = insertConceptSparql conceptUri' label
+  req <- maybe (throwError $ SparqlRequestError "Could not construct SPARQL update request") pure $
+    parseRequest ("POST " <> endpointUrl)
+  let req' = req { requestHeaders = [("Content-Type", "application/sparql-update")]
+                 , requestBody    = RequestBodyBS $ T.encodeUtf8 sparql
+                 }
+  mgr  <- liftIO $ newManager defaultManagerSettings
+  resp <- liftIO $ httpLbs req' mgr
+  let status = responseStatus resp
+  unless (statusIsSuccessful status) $
+    throwError $ SparqlResponseError status
+      (T.take 100 . T.decodeUtf8 . LBS.toStrict $ responseBody resp)
+  pure conceptUri'
+
+insertConceptSparql :: URI -> Text -> Text
+insertConceptSparql conceptUri' label =
+  "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n\
+  \PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n\
+  \INSERT DATA {\n\
+  \  <" <> render conceptUri' <> "> rdf:type skos:Concept ;\n\
+  \    skos:prefLabel \"" <> escapeSparqlLiteral label <> "\" .\n\
+  \}"
+
+escapeSparqlLiteral :: Text -> Text
+escapeSparqlLiteral =
+    T.replace "\\" "\\\\"
+  . T.replace "\"" "\\\""
+  . T.replace "\n" "\\n"
+  . T.replace "\r" "\\r"
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do
