@@ -28,6 +28,7 @@ import           Text.URI               (URI, mkURI, render)
 
 import RainbowHash.Logger            (writeLog)
 import Caldron.App        (AppError(FileError), appErrorToString, runApp)
+import qualified Caldron.HSPARQL as HSPARQL
 import qualified Caldron.File as RH
 import qualified Caldron.App as App
 import Caldron.Config     (Config (..))
@@ -91,7 +92,7 @@ homeHandler config user = do
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home user (File <$> recentFiles)
+    Right recentFiles -> pure $ Home user ((\f -> File f []) <$> recentFiles)
 
 getFileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
 getFileHandler config _ mHost fileId =
@@ -104,9 +105,11 @@ getFileHandler config _ mHost fileId =
       liftIO $ writeLog LevelInfo $ "Getting file: " <> uriText
       either' <- liftIO $ runApp (getFile fileUri) config
       case either' of
-        Left err          -> throwError $ err500 { errBody = errToLBS err }
-        Right Nothing     -> throwError err404
-        Right (Just file) -> pure $ File file
+        Left err             -> throwError $ err500 { errBody = errToLBS err }
+        Right Nothing        -> throwError err404
+        Right (Just rhFile) -> do
+          concepts <- liftIO $ HSPARQL.getConceptsByUris (sparqlEndpoint config) (RH.fileSubjects rhFile)
+          pure $ File rhFile concepts
 
 webIdFromEmail :: EmailAddress -> Config -> Maybe URI
 webIdFromEmail email = Map.lookup email . webIdMap
@@ -275,8 +278,8 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
                            }
           waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond
 
-conceptsHandler :: Maybe Text -> Handler [Concept]
-conceptsHandler mQ = pure $ maybe [] Concept.searchConcepts mQ
+conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
+conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
@@ -294,7 +297,7 @@ server config = (\authedUser -> homeHandler config authedUser
                         postFileHandler config authedUser
                         :<|>
                         putFileHandler config authedUser)
-                  :<|> conceptsHandler)
+                  :<|> conceptsHandler config)
                 :<|> staticHandler
 
 app :: Config -> Application

@@ -8,6 +8,8 @@ module Caldron.HSPARQL
   ( getRecentFiles
   , getFileForContent
   , getFile
+  , searchConcepts
+  , getConceptsByUris
   , updateFileGraphWithContent
   , SparqlError(..)
   , sparqlErrorToText
@@ -39,6 +41,7 @@ import Text.Mustache.Render (SubstitutionError)
 import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
+import Caldron.Concept             (Concept (..))
 import Caldron.File                (File (..))
 import RainbowHash.Logger              (writeLog)
 
@@ -222,6 +225,40 @@ fileQuery fileUri' = do
   optional_ (triple_ fileIri (dct .:. "subject") subject)
 
   selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject]
+
+-- TODO: we probably don't want to fetch all Concepts. Update to fetch concepts based on a search term.
+allConceptsQuery :: Query SelectQuery
+allConceptsQuery = do
+  skos <- prefix "skos" (iriRef "http://www.w3.org/2004/02/skos/core#")
+  rdf  <- prefix "rdf"  (iriRef "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+
+  uri'      <- var
+  prefLabel <- var
+
+  triple_ uri' (rdf .:. "type") (skos .:. "Concept")
+  triple_ uri' (skos .:. "prefLabel") prefLabel
+
+  selectVars [uri', prefLabel]
+
+toConcept :: [BindingValue] -> Maybe Concept
+toConcept [Bound (UNode uriText), Bound (LNode (PlainL label))] =
+  fmap (\uri -> Concept uri label) (mkURI uriText)
+toConcept _ = Nothing
+
+searchConcepts :: URI -> Text -> IO [Concept]
+searchConcepts sparqlEndpoint' q = do
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint') <> "/query") allConceptsQuery
+  let concepts = maybe [] (mapMaybe toConcept) maybeBvss
+      q' = T.toLower q
+  pure $ filter (T.isInfixOf q' . T.toLower . conceptPrefLabel) concepts
+
+getConceptsByUris :: URI -> [URI] -> IO [Concept]
+getConceptsByUris _ [] = pure []
+getConceptsByUris sparqlEndpoint' uris = do
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint') <> "/query") allConceptsQuery
+  let concepts = maybe [] (mapMaybe toConcept) maybeBvss
+      uriTexts = map render uris
+  pure $ filter ((`elem` uriTexts) . render . conceptUri) concepts
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do
