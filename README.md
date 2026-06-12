@@ -64,7 +64,8 @@ about the configuration data:
 
 ### Prerequisites
 
-The application has a dependency on the rainbow-hash project. View the README
+The application has a dependency on the
+[rainbow-hash](https://github.com/tmciver/rainbow-hash) project. View the README 
 there for instructions on creating the required Docker image (it is not yet on
 Docker Hub).
 
