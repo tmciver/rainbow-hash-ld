@@ -90,28 +90,19 @@ Both are included in the compose stack and their data is persisted under `./data
 ### Authentication
 
 Caldron authenticates the client using the [WebID-TLS
-protocol](https://www.w3.org/2005/Incubator/webid/spec/tls/). But instead of
-using a TLS-Light service described in the spec, Caldron uses a hacky version
-that uses a proxy with two different virtual hosts configured both of which use
-https. One virtual host is configured normally - this is the entrypoint to the
-app - the other is configured to request a client certificate.
-
-Once the proxy validates the client certficate, the certificate is passed on to
-the downstream server (this application) in the `X-SSL-CERT` header. If you
-visit the application URL without this proxy in place, you will receive an error
-with the message
-
-    Missing X-SSL-CERT header
-
-There are plans to [create a proper TLS-Light
-service](https://github.com/tmciver/rainbow-hash-ld/issues/28) at some point in
-the future.
+protocol](https://www.w3.org/2005/Incubator/webid/spec/tls/). You'll need to
+either have or create this certificate.
 
 #### WebID-TLS Client Certificate
 
 The client certificate used with WebID-TLS is a normal self-signed client
 certificate with one exception: the user's WebID must be added as a Subject
 Alternate Name (URL) to their certificate.
+
+Also, and this is very important: the WebID URL must point to a profile document
+that is available on the web and which includes data about the client
+certificate needed by the server for authentication.  See the WebID-TLS spec for
+more details.
 
 This repository has a facility to assist in the creation of a WebID-TLS client
 certificate as a set of Makefile targets.
