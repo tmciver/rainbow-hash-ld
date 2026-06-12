@@ -63,6 +63,7 @@ class Monad m => MetadataPut m where
     -> Integer    -- ^file size
     -> Maybe Text -- ^title
     -> Maybe Text -- ^description
+    -> [URI] -- ^subjects (SKOS Concepts)
     -> UTCTime -- ^file creation time
     -> MediaType
     -> m URI
@@ -107,10 +108,11 @@ putFile
   -> Maybe Text -- ^filename
   -> Maybe Text -- ^title
   -> Maybe Text -- ^description
+  -> [URI] -- ^subjects (SKOS Concepts)
   -> Maybe MediaType
   -> FileNodeCreateOption
   -> m (Either FileError URI)
-putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption = do
+putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc subjects maybeMT fileNodeCreateOption = do
 
   logInfoN $ "Adding file "
     <> fromMaybe "<unnamed>" (maybeFileName <&> \fn -> "\"" <> fn <> "\"")
@@ -149,7 +151,7 @@ putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc maybeMT
         case fileNodeCreateOption of
           AlwaysCreate -> do
             logInfoN "User requested creation of a new file node (even if one already exists)."
-            putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
+            putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc subjects t mt
               >>= logPutFile blobUrl t mt <&> Right
           CreateIfNotExists -> do
             maybeFileUrl <- getFileForContent blobUrl
@@ -160,7 +162,7 @@ putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc maybeMT
                 pure . Right $ fileUrl'
               Nothing -> do
                 logInfoN "No file object exists for this content; creating a new file object."
-                putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc t mt
+                putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc subjects t mt
                   >>= logPutFile blobUrl t mt <&> Right
 
 updateFileContent

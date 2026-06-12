@@ -5,7 +5,7 @@ module Caldron.View.File (File(..)) where
 import           Protolude hiding (for_)
 
 import qualified Data.CaseInsensitive as CI
-import Data.Coerce (coerce)
+
 import           Data.Text            as T
 import           Data.Text.Encoding   as T
 import           Data.Time.Clock      (UTCTime)
@@ -15,9 +15,11 @@ import           Lucid.Base           (makeAttribute)
 import           Network.HTTP.Media   (MediaType, mainType, subType)
 import           Text.URI             (render)
 
+import           Caldron.Concept  (Concept)
+import qualified Caldron.Concept  as Concept
 import qualified Caldron.File     as RH
 
-newtype File = File RH.File
+data File = File RH.File [Concept]
 
 newtype FileRow = FileRow RH.File
 
@@ -25,7 +27,7 @@ instance ToHtml [File] where
   toHtml [] = pure ()
   toHtml files = do
     let fileRows :: [FileRow]
-        fileRows = coerce files
+        fileRows = fmap (\(File f _) -> FileRow f) files
     h2_ "Recent Files"
     table_ [ makeAttribute "border" "1"
            , classes_ ["table", "table-bordered", "table-hover"]
@@ -69,7 +71,7 @@ instance ToHtml FileRow where
   toHtmlRaw = toHtml
 
 instance ToHtml File where
-  toHtml (File f) = html_ $ do
+  toHtml (File f concepts) = html_ $ do
     head_ $ do
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "/static/style.css"]
@@ -101,6 +103,11 @@ instance ToHtml File where
             tr_ $ do
               th_ "Last Modified"
               td_ (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
+            tr_ $ do
+              th_ "Subjects"
+              td_ $ forM_ (RH.fileSubjects f) $ \uri ->
+                let label = maybe (render uri) Concept.conceptPrefLabel (Concept.lookupConcept concepts uri)
+                in a_ [href_ (render uri), classes_ ["badge", "badge-pill", "badge-info", "mr-1"]] (toHtml label)
 
         form_
           [ method_ "POST"

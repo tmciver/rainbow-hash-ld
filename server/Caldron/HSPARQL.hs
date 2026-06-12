@@ -8,6 +8,9 @@ module Caldron.HSPARQL
   ( getRecentFiles
   , getFileForContent
   , getFile
+  , searchConcepts
+  , getConceptsByUris
+  , mintAndCreateConcept
   , updateFileGraphWithContent
   , SparqlError(..)
   , sparqlErrorToText
@@ -39,6 +42,7 @@ import Text.Mustache.Render (SubstitutionError)
 import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
+import Caldron.Concept             (Concept (..))
 import Caldron.File                (File (..))
 import RainbowHash.Logger              (writeLog)
 
@@ -114,7 +118,7 @@ getRecentFiles sparqlEndpoint = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl []
         toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
 
 getFile :: URI -> URI -> IO (Maybe File)
@@ -131,14 +135,15 @@ getFile sparqlEndpoint fileUriToGet = do
   pure $ case maybeBvss of
     Nothing -> Nothing
     Just [] -> Nothing
-    Just (bvs:_) -> hush $ toFile fileUriToGet bvs
+    Just rows@(firstRow:_) -> hush $ toFile fileUriToGet rows firstRow
 
   where toFile
           :: MonadError HsparqlError m
           => URI
+          -> [[BindingValue]]
           -> [BindingValue]
           -> m File
-        toFile fileUri' [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile fileUri' rows [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, _] = do
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
           maybeTitle <- getPlainLiteralMaybe titleBV
@@ -148,8 +153,11 @@ getFile sparqlEndpoint fileUriToGet = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl
-        toFile _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 8
+          subjects <- catMaybes <$> mapM subjectFromRow rows
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl subjects
+        toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
+        subjectFromRow [_, _, _, _, _, _, _, _, subjectBV] = getUriMaybe subjectBV
+        subjectFromRow _ = pure Nothing
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
@@ -202,6 +210,7 @@ fileQuery fileUri' = do
   created <- var
   updated <- var
   contentUrl <- var
+  subject <- var
 
   -- where clause
   let fileIri = iriRef (render fileUri')
@@ -214,10 +223,81 @@ fileQuery fileUri' = do
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
+  optional_ (triple_ fileIri (dct .:. "subject") subject)
 
-  limit_ 1
+  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject]
 
-  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl]
+-- TODO: we probably don't want to fetch all Concepts. Update to fetch concepts based on a search term.
+allConceptsQuery :: Query SelectQuery
+allConceptsQuery = do
+  skos <- prefix "skos" (iriRef "http://www.w3.org/2004/02/skos/core#")
+  rdf  <- prefix "rdf"  (iriRef "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+
+  uri'      <- var
+  prefLabel <- var
+
+  triple_ uri' (rdf .:. "type") (skos .:. "Concept")
+  triple_ uri' (skos .:. "prefLabel") prefLabel
+
+  selectVars [uri', prefLabel]
+
+toConcept :: [BindingValue] -> Maybe Concept
+toConcept [Bound (UNode uriText), Bound (LNode (PlainL label))] =
+  fmap (\uri -> Concept uri label) (mkURI uriText)
+toConcept _ = Nothing
+
+searchConcepts :: URI -> Text -> IO [Concept]
+searchConcepts sparqlEndpoint' q = do
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint') <> "/query") allConceptsQuery
+  let concepts = maybe [] (mapMaybe toConcept) maybeBvss
+      q' = T.toLower q
+  pure $ filter (T.isInfixOf q' . T.toLower . conceptPrefLabel) concepts
+
+getConceptsByUris :: URI -> [URI] -> IO [Concept]
+getConceptsByUris _ [] = pure []
+getConceptsByUris sparqlEndpoint' uris = do
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint') <> "/query") allConceptsQuery
+  let concepts = maybe [] (mapMaybe toConcept) maybeBvss
+      uriTexts = map render uris
+  pure $ filter ((`elem` uriTexts) . render . conceptUri) concepts
+
+-- | Mint a fresh UUID-based URI for a new SKOS Concept, insert it into the
+-- triple store, and return the minted URI.
+mintAndCreateConcept :: URI -> Text -> Text -> IO (Either SparqlError URI)
+mintAndCreateConcept sparqlEndpoint' host' label = runExceptT $ do
+  conceptId   <- liftIO nextRandom
+  conceptUri' <- maybe (throwError $ MalformedURI "Could not construct concept URI") pure $
+    mkURI $ "https://" <> host' <> "/concepts/" <> toText conceptId
+  let endpointUrl = unpack (render sparqlEndpoint') <> "/update"
+      sparql      = insertConceptSparql conceptUri' label
+  req <- maybe (throwError $ SparqlRequestError "Could not construct SPARQL update request") pure $
+    parseRequest ("POST " <> endpointUrl)
+  let req' = req { requestHeaders = [("Content-Type", "application/sparql-update")]
+                 , requestBody    = RequestBodyBS $ T.encodeUtf8 sparql
+                 }
+  mgr  <- liftIO $ newManager defaultManagerSettings
+  resp <- liftIO $ httpLbs req' mgr
+  let status = responseStatus resp
+  unless (statusIsSuccessful status) $
+    throwError $ SparqlResponseError status
+      (T.take 100 . T.decodeUtf8 . LBS.toStrict $ responseBody resp)
+  pure conceptUri'
+
+insertConceptSparql :: URI -> Text -> Text
+insertConceptSparql conceptUri' label =
+  "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n\
+  \PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n\
+  \INSERT DATA {\n\
+  \  <" <> render conceptUri' <> "> rdf:type skos:Concept ;\n\
+  \    skos:prefLabel \"" <> escapeSparqlLiteral label <> "\" .\n\
+  \}"
+
+escapeSparqlLiteral :: Text -> Text
+escapeSparqlLiteral =
+    T.replace "\\" "\\\\"
+  . T.replace "\"" "\\\""
+  . T.replace "\n" "\\n"
+  . T.replace "\r" "\\r"
 
 getFileForContent :: URI -> URI -> IO (Maybe URI)
 getFileForContent contentUrl sparqlEndpoint = do
@@ -285,6 +365,12 @@ getUri
   => BindingValue
   -> m URI
 getUri = parseUnboundAsError parseUri
+
+getUriMaybe
+  :: MonadError HsparqlError m
+  => BindingValue
+  -> m (Maybe URI)
+getUriMaybe = sequence . parseBoundNode parseUri
 
 parsePlainLiteralNode
   :: MonadError HsparqlError m

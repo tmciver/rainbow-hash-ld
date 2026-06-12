@@ -28,6 +28,7 @@ import           Text.URI               (URI, mkURI, render)
 
 import RainbowHash.Logger            (writeLog)
 import Caldron.App        (AppError(FileError), appErrorToString, runApp)
+import qualified Caldron.HSPARQL as HSPARQL
 import qualified Caldron.File as RH
 import qualified Caldron.App as App
 import Caldron.Config     (Config (..))
@@ -39,6 +40,8 @@ import Caldron.View.File  (File (..))
 import Caldron.View.Home  (Home (..))
 import Caldron.View.HTML  (HTML)
 import Caldron.EmailAddress (EmailAddress(..))
+import qualified Caldron.Concept as Concept
+import Caldron.Concept (Concept)
 
 type FilesAPI =
   WebIDUserAuth :>
@@ -73,6 +76,7 @@ type FilesAPI =
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PutNoContent
       )
+    :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
   )
   :<|> "static" :> Raw
 
@@ -88,7 +92,7 @@ homeHandler config user = do
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home user (File <$> recentFiles)
+    Right recentFiles -> pure $ Home user ((\f -> File f []) <$> recentFiles)
 
 getFileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
 getFileHandler config _ mHost fileId =
@@ -101,9 +105,11 @@ getFileHandler config _ mHost fileId =
       liftIO $ writeLog LevelInfo $ "Getting file: " <> uriText
       either' <- liftIO $ runApp (getFile fileUri) config
       case either' of
-        Left err          -> throwError $ err500 { errBody = errToLBS err }
-        Right Nothing     -> throwError err404
-        Right (Just file) -> pure $ File file
+        Left err             -> throwError $ err500 { errBody = errToLBS err }
+        Right Nothing        -> throwError err404
+        Right (Just rhFile) -> do
+          concepts <- liftIO $ HSPARQL.getConceptsByUris (sparqlEndpoint config) (RH.fileSubjects rhFile)
+          pure $ File rhFile concepts
 
 webIdFromEmail :: EmailAddress -> Config -> Maybe URI
 webIdFromEmail email = Map.lookup email . webIdMap
@@ -204,6 +210,8 @@ filesHandler config user mHost mFrom multipartData = do
                    else Just fn
               maybeTitle = getTitle fields
               maybeDesc = getDescription fields
+              subjects = mapMaybe mkURI $ getSubjects fields
+              newConceptLabels = getNewConceptLabels fields
               maybeMT :: Maybe MediaType
               maybeMT = Nothing
               fileNodeCreateOption :: FileNodeCreateOption
@@ -212,7 +220,16 @@ filesHandler config user mHost mFrom multipartData = do
           -- See if there's an on-behalf-of user
           mAuthorUri <- maybe (pure Nothing) (getWebIdForEmail config) (mFrom' <&> EmailAddress)
 
-          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc maybeMT fileNodeCreateOption) config
+          -- Mint URIs and persist any newly created concepts
+          newConceptUris <- liftIO $ do
+            results <- mapM (HSPARQL.mintAndCreateConcept (sparqlEndpoint config) host') newConceptLabels
+            let (errs, uris) = partitionEithers results
+            forM_ errs $ \err -> writeLog LevelError (HSPARQL.sparqlErrorToText err)
+            pure uris
+
+          let allSubjects = subjects <> newConceptUris
+
+          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption) config
           case either' of
             Left err  -> (liftIO $ writeLog LevelError $ appErrorToString err) >> (throwError $ err500 { errBody = errToLBS err })
             Right (Left err) -> (liftIO $ writeLog LevelError $ fileErrorToText err) >> (throwError $ err400 { errBody = errToLBS $ FileError err })
@@ -227,6 +244,12 @@ filesHandler config user mHost mFrom multipartData = do
         getDescription = (<&> iValue) . find isDescription
           where isDescription :: Input -> Bool
                 isDescription = (== "description") . iName
+
+        getSubjects :: [Input] -> [Text]
+        getSubjects = fmap iValue . filter ((== "subject") . iName)
+
+        getNewConceptLabels :: [Input] -> [Text]
+        getNewConceptLabels = fmap iValue . filter ((== "new-concept") . iName)
 
         getFileNodeCreationOption :: [Input] -> FileNodeCreateOption
         getFileNodeCreationOption = boolToFNCO . maybe False (isEnabled . iValue) . find isFileNodeCreationOption
@@ -268,6 +291,9 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
                            }
           waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond
 
+conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
+conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
+
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
@@ -283,7 +309,8 @@ server config = (\authedUser -> homeHandler config authedUser
                         -- PUTs from programmatic clients will use the below PUT handler
                         postFileHandler config authedUser
                         :<|>
-                        putFileHandler config authedUser))
+                        putFileHandler config authedUser)
+                  :<|> conceptsHandler config)
                 :<|> staticHandler
 
 app :: Config -> Application
