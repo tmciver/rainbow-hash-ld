@@ -15,11 +15,14 @@ data Home = Home User [File]
 instance ToHtml Home where
   toHtml (Home user files) = html_ $ do
     head_ $ do
+      meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1, shrink-to-fit=no"]
+      title_ "Caldron"
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "static/style.css"]
     body_ $ do
-      div_ [class_ "body-wrapper"] $ do
-        h1_ "Caldron"
+      nav_ [classes_ ["navbar", "navbar-dark", "bg-dark", "px-3"]] $
+        a_ [class_ "navbar-brand", href_ "/"] "Caldron"
+      div_ [classes_ ["container", "mt-4"]] $ do
         let name' = fromMaybe "there" (userName user)
         p_ (toHtml $ "Hello, " <> name' <> "!")
         form_
