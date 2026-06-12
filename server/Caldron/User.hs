@@ -22,7 +22,7 @@ import qualified Data.X509                             as X509
 
 import Control.Monad.Error (mapError)
 import Caldron.WebID (WebID)
-import Caldron.Profile (getProfile, Profile(..), ProfileError)
+import Caldron.Profile (ProfileCache, getProfile, Profile(..), ProfileError)
 import qualified Caldron.Profile as Profile
 import Caldron.Crypto (validateCert, CryptoError)
 import qualified Caldron.Crypto as Crypto
@@ -64,12 +64,13 @@ validateUser
      , MonadLogger m
      , MonadIO m
      )
-  => WebID
+  => ProfileCache
+  -> WebID
   -> X509.Certificate
   -> m User
-validateUser webId' cert = do
+validateUser cache webId' cert = do
   -- fetch user's profile document
-  Profile{..} <- mapError ProfileError (getProfile webId')
+  Profile{..} <- mapError ProfileError (getProfile cache webId')
 
   -- compare the modulus and exponent to that in the certificate
   mapError (const Unauthenticated) (validateCert cert certData)

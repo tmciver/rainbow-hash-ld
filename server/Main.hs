@@ -13,6 +13,7 @@ import           Text.URI                 (render)
 
 import           Caldron.Config       (Config (Config), getConfig)
 import           Caldron.Options      (Options (..), optionsParserInfo)
+import           Caldron.Profile      (newProfileCache)
 import           Caldron.Server       (app)
 
 configToText :: Config -> Text
@@ -35,4 +36,5 @@ main = do
     Right config -> do
       putStrLn $ configToText config
       putStrLn $ "Caldron running on port " <> (show port' :: Text)
-      run port' (app config)
+      cache <- newProfileCache
+      run port' (app config cache)

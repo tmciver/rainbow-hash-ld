@@ -34,6 +34,7 @@ import qualified Caldron.App as App
 import Caldron.Config     (Config (..))
 import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile, fileErrorToText)
+import Caldron.Profile    (ProfileCache)
 import Caldron.Servant    (WebIDUserAuth, genAuthServerContext)
 import Caldron.User (User, userWebId)
 import Caldron.View.File  (File (..))
@@ -313,5 +314,5 @@ server config = (\authedUser -> homeHandler config authedUser
                   :<|> conceptsHandler config)
                 :<|> staticHandler
 
-app :: Config -> Application
-app config = serveWithContext api genAuthServerContext (server config)
+app :: Config -> ProfileCache -> Application
+app config cache = serveWithContext api (genAuthServerContext cache) (server config)
