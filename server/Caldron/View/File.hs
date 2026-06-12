@@ -21,54 +21,47 @@ import qualified Caldron.File     as RH
 
 data File = File RH.File [Concept]
 
-newtype FileRow = FileRow RH.File
+-- ---------------------------------------------------------------------------
+-- Helpers
+
+showMediaType :: MediaType -> Text
+showMediaType mt = T.decodeUtf8 . CI.original $ mainType mt <> "/" <> subType mt
+
+showUTCTime :: UTCTime -> Text
+showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
+
+-- ---------------------------------------------------------------------------
+-- Recent-files gallery (used on the home page)
 
 instance ToHtml [File] where
   toHtml [] = pure ()
   toHtml files = do
-    let fileRows :: [FileRow]
-        fileRows = fmap (\(File f _) -> FileRow f) files
-    h2_ "Recent Files"
-    table_ [ makeAttribute "border" "1"
-           , classes_ ["table", "table-bordered", "table-hover"]
-           ] $ do
-      thead_ [class_ "thead-dark"] $ do
-        tr_ $ do
-          th_ "File name"
-          th_ "Size (bytes)"
-          th_ "Title"
-          th_ "Description"
-          th_ "Media Type"
-          th_ "Created"
-          th_ "Last Modified"
-      tbody_ (foldMap toHtml fileRows)
+    h2_ [classes_ ["mt-4", "mb-3"]] "Recent Files"
+    div_ [class_ "row"] $
+      forM_ files $ \(File f _) -> do
+        let fileLink = render (RH.fileUri f)
+            label    = fromMaybe (fromMaybe "" (RH.fileName f)) (RH.fileTitle f)
+        div_ [classes_ ["col-6", "col-md-4", "col-lg-3", "mb-4"]] $
+          div_ [classes_ ["card", "h-100"]] $ do
+            img_ [ src_ (fileLink <> "/thumbnail")
+                 , class_ "card-img-top"
+                 , style_ "height: 140px; object-fit: cover;"
+                 , alt_ "File thumbnail"
+                 , makeAttribute "onerror" "this.style.display='none'"
+                 ]
+            div_ [classes_ ["card-body", "p-2"]] $
+              h6_ [classes_ ["card-title", "mb-0"]] $
+                a_ [ href_ fileLink
+                   , classes_ ["stretched-link", "text-dark"]
+                   ] (toHtml label)
+            div_ [classes_ ["card-footer", "text-muted", "small", "p-2"]] $ do
+              div_ (toHtml $ showMediaType (RH.fileMediaType f))
+              div_ (toHtml $ showUTCTime (RH.fileCreatedAt f))
 
   toHtmlRaw = toHtml
 
-instance ToHtml FileRow where
-  toHtml (FileRow f) =
-    let fileLink = render (RH.fileUri f)
-        linkedCell ::
-          Applicative m
-          => HtmlT m ()
-          -> HtmlT m ()
-        linkedCell content = td_ $ a_ [href_ fileLink] content
-    in tr_ $ do
-      linkedCell (toHtml . fromMaybe "" . RH.fileName $ f)
-      linkedCell (toHtml . (show :: Integer -> Text) . RH.fileSize $ f)
-      linkedCell (toHtml . fromMaybe "" . RH.fileTitle $ f)
-      linkedCell (toHtml . fromMaybe "" . RH.fileDescription $ f)
-      linkedCell (toHtml . showMediaType . RH.fileMediaType $ f)
-      linkedCell (toHtml . showUTCTime . RH.fileCreatedAt $ f)
-      linkedCell (toHtml . showUTCTime . RH.fileUpdatedAt $ f)
-
-    where showMediaType :: MediaType -> Text
-          showMediaType mt = T.decodeUtf8 . CI.original $ mainType mt <> "/" <> subType mt
-
-          showUTCTime :: UTCTime -> Text
-          showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
-
-  toHtmlRaw = toHtml
+-- ---------------------------------------------------------------------------
+-- Single-file view page
 
 instance ToHtml File where
   toHtml (File f concepts) = html_ $ do
@@ -83,16 +76,11 @@ instance ToHtml File where
       div_ [class_ "container-fluid", style_ "height: calc(100vh - 56px)"] $
         div_ [classes_ ["row", "no-gutters", "h-100"]] $ do
           div_ [classes_ ["col-md-8", "h-100"]] $
-            iframe_ [ src_ (fileContentSrc f)
+            iframe_ [ src_ (render (RH.fileUri f) <> "/content")
                     , style_ "width: 100%; height: 100%; border: 0;"
                     ] (toHtml ("" :: Text))
           div_ [classes_ ["col-md-4", "h-100", "overflow-auto", "border-left", "p-3"]] $ do
             div_ [classes_ ["card", "mb-3"]] $ do
-              img_ [ src_ (fileThumbnailSrc f)
-                   , class_ "card-img-top"
-                   , alt_ "File thumbnail"
-                   , makeAttribute "onerror" "this.style.display='none'"
-                   ]
               div_ [class_ "card-header"] $ strong_ "Metadata"
               div_ [classes_ ["card-body", "p-0"]] $
                 table_ [classes_ ["table", "table-sm", "table-bordered", "mb-0"]] $
@@ -114,7 +102,7 @@ instance ToHtml File where
               div_ [class_ "card-body"] $
                 form_
                   [ method_ "POST"
-                  , action_ (filePostAction f)
+                  , action_ (render . RH.fileUri $ f)
                   , enctype_ "multipart/form-data"
                   ] $ do
                   div_ [class_ "form-group"] $ do
@@ -130,20 +118,5 @@ instance ToHtml File where
           metaRow lbl val = tr_ $ do
             th_ [classes_ ["align-middle", "text-nowrap", "bg-light"]] (toHtml lbl)
             td_ (toHtml val)
-
-          showMediaType :: MediaType -> Text
-          showMediaType mt = T.decodeUtf8 . CI.original $ mainType mt <> "/" <> subType mt
-
-          showUTCTime :: UTCTime -> Text
-          showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
-
-          filePostAction :: RH.File -> Text
-          filePostAction = render . RH.fileUri
-
-          fileContentSrc :: RH.File -> Text
-          fileContentSrc f' = render (RH.fileUri f') <> "/content"
-
-          fileThumbnailSrc :: RH.File -> Text
-          fileThumbnailSrc f' = render (RH.fileUri f') <> "/thumbnail"
 
   toHtmlRaw = toHtml

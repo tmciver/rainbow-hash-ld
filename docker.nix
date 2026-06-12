@@ -6,7 +6,7 @@ in
 pkgs.dockerTools.buildLayeredImage {
   name = "com.timmciver/caldron";
   tag = "latest";
-  contents = [ caldron pkgs.cacert pkgs.busybox ];
+  contents = [ caldron pkgs.cacert pkgs.busybox pkgs.imagemagick pkgs.ghostscript ];
   extraCommands = ''
     mkdir -p tmp
     chmod 1777 tmp
