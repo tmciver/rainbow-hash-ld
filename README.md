@@ -8,36 +8,50 @@ store with metadata stored using **L**inked **D**ata.
 Caldron is developed using [Nix](https://nixos.org/) and currently that is the
 only supported method of building the application.
 
-To build using Nix, run
+To build the application, run
 
-    $ nix-build
+    $ make build
+
+To build and load the Docker image, run
+
+    $ make docker
 
 ## Configuration
 
 ### Server
 
-There are several ways to supply the needed configuration data to the server: a
-config file, environment variables and command line arguments, in order of
-increasing precedence. The following table gives information about configuration
-data.
+The server is configured via environment variables set in `docker-compose.yml`.
+The following table describes the available options.
 
-|Description|Config File Field Name|Environment Variable Name|Command Line Argument Name|Required|Default Value|
-|-----------|----------------|-------------------------|--------------------------|--------|-------------|
-|SPARQL URL - a URL to SPARQL server |`sparql-url`|`SPARQL_URL`|`--sparql-url`|Yes|N/A|
-|Blob Store URL - a URL to a rainbow-hash-compatible file store|`file-store-url`|`FILE_STORE_URL`|`--file-store-url`|Yes|N/A|
-|Network Port|N/A|N/A|`--port`,`-p`|No|80|
-|Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`preferred-host`|`PREFERRED_HOST`|`--preferred-host`|No|Value of `HOST` header|
-|Email-to-WebID Map - a mapping of email address to WebID used to implement "on behalf of" functionalilty (see note below)|`webid-map`|N/A|N/A|No|None|
+|Description|Environment Variable Name|Required|Default Value|
+|-----------|-------------------------|--------|-------------|
+|SPARQL URL - a URL to a SPARQL server|`SPARQL_URL`|Yes|`http://fuseki:3030/ds`|
+|Blob Store URL - a URL to a rainbow-hash-compatible file store|`FILE_STORE_URL`|Yes|`http://rainbow-hash:3000/blobs`|
+|Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`PREFERRED_HOST`|No|Value of `HOST` header|
+
+The default `docker-compose.yml` pre-configures `SPARQL_URL` and `FILE_STORE_URL`
+to point at the bundled Fuseki and rainbow-hash services respectively. Edit those
+values if you are using external services.
+
+### SSL Certificates
+
+The nginx proxy service expects the server certificate and key to be present in
+the project root:
+
+    caldron.timmciver.com.crt
+    caldron.timmciver.com.key
+
+Place your certificate and key files there before starting the stack.
 
 ### CLI Tool
 
-The `caldron` CLI app operates using using the following sub-commands:
+The `caldron` CLI app operates using the following sub-commands:
 
 * `upload <FILE-OR-DIR> <options>`
 * `watch <DIR> <options>`
 
 They both take the same options which can be configured via command line
-arguments and/or a configuration file. The following table gives informaton
+arguments and/or a configuration file. The following table gives information
 about the configuration data:
 
 |Description|Config File Field Name|Command Line Argument Name|Required|Default Value|
@@ -48,58 +62,47 @@ about the configuration data:
 
 ## Running
 
-Note that currently this application cannot be used standalone; it must be
-behind a proxy. See the note about authentication below.
+### Prerequisites
 
-Also note that a SPARQL server and a `rainbow-hash`-compatible file store must
-be configured.
+The application has a dependency on the
+[rainbow-hash](https://github.com/tmciver/rainbow-hash) project. View the README 
+there for instructions on creating the required Docker image (it is not yet on
+Docker Hub).
 
-Once the application is built, you can run it with
+### Running with Docker Compose
 
-    $ ./result/bin/caldron-server \
-      --file-store-url URL \
-      --sparql-url URL
+Start the stack with:
 
-Or, just edit and run `run.sh`:
+    $ docker compose up -d
 
-    $ ./run.sh
+To stop the stack:
 
-The URL supplied to `--file-store-url` should be a URL to a
-[rainbow-hash](https://github.com/tmciver/rainbow-hash) compatible file store
-and the URL supplied to `--sparql-url` shoulde be a URL to a [SPARQL
-server](https://www.w3.org/TR/sparql11-protocol/) that also supports the [Graph
-Store Protocol](https://www.w3.org/TR/sparql11-http-rdf-update/). Caldron has
-only been tested using [Fuseki](https://jena.apache.org/documentation/fuseki2/).
+    $ docker compose down
 
-You can also specify a port with `-p` or `--port`. The default port is 80.
+Logs can be viewed with:
+
+    $ docker compose logs -f
+
+Visit https://localhost to use the application.
 
 ## Notes
 
 ### Authentication
 
 Caldron authenticates the client using the [WebID-TLS
-protocol](https://www.w3.org/2005/Incubator/webid/spec/tls/). But instead of
-using a TLS-Light service described in the spec, Caldron uses a hacky version
-that uses a proxy with two different virtual hosts configured both of which use
-https. One virtual host is configured normally - this is the entrypoint to the
-app - the other is configured to request a client certificate.
-
-Once the proxy validates the client certficate, the certificate is passed on to
-the downstream server (this application) in the `X-SSL-CERT` header. If you
-visit the application URL without this proxy in place, you will receive an error
-with the message
-
-    Missing X-SSL-CERT header
-
-There are plans to [create a proper TLS-Light
-service](https://github.com/tmciver/rainbow-hash-ld/issues/28) at some point in
-the future.
+protocol](https://www.w3.org/2005/Incubator/webid/spec/tls/). You'll need to
+either have or create this certificate.
 
 #### WebID-TLS Client Certificate
 
 The client certificate used with WebID-TLS is a normal self-signed client
 certificate with one exception: the user's WebID must be added as a Subject
 Alternate Name (URL) to their certificate.
+
+Also, and this is very important: the WebID URL must point to a profile document
+that is available on the web and which includes data about the client
+certificate needed by the server for authentication.  See the WebID-TLS spec for
+more details.
 
 This repository has a facility to assist in the creation of a WebID-TLS client
 certificate as a set of Makefile targets.
