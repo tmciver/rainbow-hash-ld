@@ -25,8 +25,8 @@ The following table describes the available options.
 
 |Description|Environment Variable Name|Required|Default Value|
 |-----------|-------------------------|--------|-------------|
-|SPARQL URL - a URL to a SPARQL server|`SPARQL_URL`|Yes|N/A|
-|Blob Store URL - a URL to a rainbow-hash-compatible file store|`FILE_STORE_URL`|Yes|N/A|
+|SPARQL URL - a URL to a SPARQL server|`SPARQL_URL`|Yes|`http://fuseki:3030/ds`|
+|Blob Store URL - a URL to a rainbow-hash-compatible file store|`FILE_STORE_URL`|Yes|`http://rainbow-hash:3000/blobs`|
 |Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`PREFERRED_HOST`|No|Value of `HOST` header|
 
 The default `docker-compose.yml` pre-configures `SPARQL_URL` and `FILE_STORE_URL`
