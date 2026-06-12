@@ -88,6 +88,11 @@ instance ToHtml File where
                     ] (toHtml ("" :: Text))
           div_ [classes_ ["col-md-4", "h-100", "overflow-auto", "border-left", "p-3"]] $ do
             div_ [classes_ ["card", "mb-3"]] $ do
+              img_ [ src_ (fileThumbnailSrc f)
+                   , class_ "card-img-top"
+                   , alt_ "File thumbnail"
+                   , makeAttribute "onerror" "this.style.display='none'"
+                   ]
               div_ [class_ "card-header"] $ strong_ "Metadata"
               div_ [classes_ ["card-body", "p-0"]] $
                 table_ [classes_ ["table", "table-sm", "table-bordered", "mb-0"]] $
@@ -137,5 +142,8 @@ instance ToHtml File where
 
           fileContentSrc :: RH.File -> Text
           fileContentSrc f' = render (RH.fileUri f') <> "/content"
+
+          fileThumbnailSrc :: RH.File -> Text
+          fileThumbnailSrc f' = render (RH.fileUri f') <> "/thumbnail"
 
   toHtmlRaw = toHtml

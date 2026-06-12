@@ -9,6 +9,7 @@ module Caldron.Server (app) where
 import           Protolude              hiding (Handler)
 
 import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
+import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
 import           Data.Tagged            (Tagged (..))
@@ -20,7 +21,7 @@ import           Network.HTTP.Client    (defaultManagerSettings, newManager,
 import           Network.HTTP.Media     (MediaType)
 import           Network.HTTP.ReverseProxy (ProxyDest (..), WaiProxyResponse (..),
                                             defaultOnExc, waiProxyTo)
-import           Network.HTTP.Types     (status400, status404, status500)
+import           Network.HTTP.Types     (status200, status400, status404, status500)
 import           Network.Wai            (Application, responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
 import           Servant                hiding (URI)
 import           Servant.Multipart
@@ -35,6 +36,7 @@ import Caldron.Config     (Config (..))
 import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile, fileErrorToText)
 import Caldron.Profile    (ProfileCache)
+import Caldron.Thumbnail  (getThumbnail)
 import Caldron.Servant    (WebIDUserAuth, genAuthServerContext)
 import Caldron.User (User, userWebId)
 import Caldron.View.File  (File (..))
@@ -76,6 +78,11 @@ type FilesAPI =
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PutNoContent
+      :<|>
+           Header "Host" Text
+        :> Capture "fileId" Text
+        :> "thumbnail"
+        :> Raw
       )
     :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
   )
@@ -292,6 +299,30 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
                            }
           waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond
 
+thumbnailCacheDir :: FilePath
+thumbnailCacheDir = "data/thumbnails"
+
+thumbnailHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
+thumbnailHandler config _ mHost fileId = Tagged $ \_ respond -> do
+  let defaultHost = "example.com"
+      host = fromMaybe defaultHost $ preferredHost config <|> mHost
+      uriText = "https://" <> host <> "/file/" <> fileId
+  case mkURI uriText of
+    Nothing -> respond $ responseLBS status400 [] "Invalid file URI."
+    Just fileUri -> do
+      either' <- runApp (getFile fileUri) config
+      case either' of
+        Left _              -> respond $ responseLBS status500 [] "Error fetching file metadata."
+        Right Nothing       -> respond $ responseLBS status404 [] "File not found."
+        Right (Just rhFile) -> do
+          let contentUrl = render (RH.fileContent rhFile)
+          mThumb <- getThumbnail thumbnailCacheDir fileId contentUrl
+          case mThumb of
+            Nothing    -> respond $ responseLBS status404 [] "Thumbnail not available for this file type."
+            Just thumb -> respond $ responseLBS status200
+              [("Content-Type", "image/jpeg")]
+              (LBS.fromStrict thumb)
+
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
@@ -310,7 +341,9 @@ server config = (\authedUser -> homeHandler config authedUser
                         -- PUTs from programmatic clients will use the below PUT handler
                         postFileHandler config authedUser
                         :<|>
-                        putFileHandler config authedUser)
+                        putFileHandler config authedUser
+                        :<|>
+                        thumbnailHandler config authedUser)
                   :<|> conceptsHandler config)
                 :<|> staticHandler
 

@@ -5,6 +5,8 @@ FROM debian:12-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libgmp10 \
+    imagemagick \
+    ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binary

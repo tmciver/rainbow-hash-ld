@@ -6,6 +6,8 @@ services:
       - LOG_LEVEL=INFO
       - FILE_STORE_URL=http://rainbow-hash:3000/blobs
       - SPARQL_URL=http://fuseki:3030/ds
+    volumes:
+      - ./data/thumbnails:/data/thumbnails
     depends_on:
       - rainbow-hash
       - fuseki
