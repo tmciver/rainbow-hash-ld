@@ -62,14 +62,15 @@ about the configuration data:
 
 ## Running
 
-Note that currently this application cannot be used standalone; it must be
-behind a proxy. See the note about authentication below.
+### Prerequisites
 
-The stack includes all required services (Caldron, Fuseki, rainbow-hash, and an
-nginx proxy) and is managed with Docker Compose.
+The application has a dependency on the rainbow-hash project. View the README
+there for instructions on creating the required Docker image (it is not yet on
+Docker Hub).
 
-Once the Docker image is built and configuration is in place, start the stack
-with:
+### Running with Docker Compose
+
+Start the stack with:
 
     $ docker compose up -d
 
@@ -81,9 +82,7 @@ Logs can be viewed with:
 
     $ docker compose logs -f
 
-The SPARQL endpoint is provided by [Fuseki](https://jena.apache.org/documentation/fuseki2/)
-and the blob store by [rainbow-hash](https://github.com/tmciver/rainbow-hash).
-Both are included in the compose stack and their data is persisted under `./data/`.
+Visit https://localhost to use the application.
 
 ## Notes
 
