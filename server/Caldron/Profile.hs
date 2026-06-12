@@ -7,6 +7,8 @@
 
 module Caldron.Profile
   ( Profile(..)
+  , ProfileCache
+  , newProfileCache
   , getProfile
   , ProfileError(..)
   , errorToText
@@ -14,10 +16,12 @@ module Caldron.Profile
 
 import           Protolude
 
+import           Control.Concurrent   (MVar, newMVar, readMVar, modifyMVar_)
 import           Control.Monad.Logger (MonadLogger, logDebugN, logErrorN,
                                        logInfoN)
 import           Data.RDF             (RDF, Rdf, TurtleParser (..))
 import qualified Data.RDF             as RDF
+import qualified Data.Map.Strict      as Map
 import qualified Data.Text            as T
 import qualified Data.Text.Read            as T
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
@@ -25,6 +29,11 @@ import           Text.URI             (render)
 
 import Caldron.Crypto   (CertificateData (..))
 import Caldron.WebID     (WebID)
+
+type ProfileCache = MVar (Map Text Profile)
+
+newProfileCache :: IO ProfileCache
+newProfileCache = newMVar Map.empty
 
 data Profile = Profile
   { certData :: NonEmpty CertificateData
@@ -209,7 +218,17 @@ getProfile
      , MonadLogger m
      , MonadIO m
      )
-  => WebID
+  => ProfileCache
+  -> WebID
   -> m Profile
-getProfile webId' =
-  getProfileGraph @RDF.TList webId' >>= parseProfile
+getProfile cache webId' = do
+  let key = render webId'
+  cached <- liftIO $ readMVar cache
+  case Map.lookup key cached of
+    Just profile -> do
+      logInfoN $ "Using cached profile for " <> key
+      pure profile
+    Nothing -> do
+      profile <- getProfileGraph @RDF.TList webId' >>= parseProfile
+      liftIO $ modifyMVar_ cache (pure . Map.insert key profile)
+      pure profile

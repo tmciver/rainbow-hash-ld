@@ -30,6 +30,7 @@ import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
                                                    mkAuthHandler)
 import           Text.URI                         (mkURI)
 
+import Caldron.Profile (ProfileCache)
 import Caldron.User (User)
 import Caldron.WebID (WebID)
 import qualified Caldron.User as User
@@ -37,8 +38,8 @@ import qualified Caldron.User as User
 type WebIDUserAuth = AuthProtect "webid-auth"
 type instance AuthServerData WebIDUserAuth = User
 
-validateUser :: ByteString -> Handler User
-validateUser bs = do
+validateUser :: ProfileCache -> ByteString -> Handler User
+validateUser cache bs = do
   let decodedBS = urlDecode True bs
   parsePEM decodedBS >>= getCertificate >>= validateWebProfile
 
@@ -73,7 +74,7 @@ validateUser bs = do
       validateWebProfile :: X509.Certificate -> Handler User
       validateWebProfile cert = do
         webId' <- getAltName cert >>= getWebIdFromAltName
-        eitherRes <- liftIO . User.run $ User.validateUser webId' cert
+        eitherRes <- liftIO . User.run $ User.validateUser cache webId' cert
         case eitherRes of
           Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . User.errorToText $ e) }
           Right user -> pure user
@@ -81,8 +82,8 @@ validateUser bs = do
 --- | The auth handler wraps a function from Request -> Handler WebID.
 --- We look for the client certificate in the X-SSL-CERT request header.
 --- The client certificate text is then passed to our `getWebid` function.
-authHandler :: AuthHandler Request User
-authHandler = mkAuthHandler handler
+authHandler :: ProfileCache -> AuthHandler Request User
+authHandler cache = mkAuthHandler handler
   where
     throw401 msg = throwError $ err401 { errBody = msg }
     handler :: Request -> Handler User
@@ -91,10 +92,10 @@ authHandler = mkAuthHandler handler
           & Map.fromList
           & Map.lookup "X-SSL-Client-Cert"
           & maybeToEither "Missing X-SSL-Client-Cert header"
-          & either throw401 validateUser
+          & either throw401 (validateUser cache)
 
 -- | The context that will be made available to request handlers. We supply the
 -- "cookie-auth"-tagged request handler defined above, so that the 'HasServer' instance
 -- of 'AuthProtect' can extract the handler and run it on the request.
-genAuthServerContext :: Context (AuthHandler Request User ': '[])
-genAuthServerContext = authHandler :. EmptyContext
+genAuthServerContext :: ProfileCache -> Context (AuthHandler Request User ': '[])
+genAuthServerContext cache = authHandler cache :. EmptyContext
