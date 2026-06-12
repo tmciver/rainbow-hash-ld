@@ -17,6 +17,8 @@ module Caldron.Profile
 import           Protolude
 
 import           Control.Concurrent   (MVar, newMVar, readMVar, modifyMVar_)
+import           Data.Time.Clock      (UTCTime, NominalDiffTime, getCurrentTime,
+                                       diffUTCTime)
 import           Control.Monad.Logger (MonadLogger, logDebugN, logErrorN,
                                        logInfoN)
 import           Data.RDF             (RDF, Rdf, TurtleParser (..))
@@ -30,7 +32,10 @@ import           Text.URI             (render)
 import Caldron.Crypto   (CertificateData (..))
 import Caldron.WebID     (WebID)
 
-type ProfileCache = MVar (Map Text Profile)
+type ProfileCache = MVar (Map Text (UTCTime, Profile))
+
+cacheTTL :: NominalDiffTime
+cacheTTL = 30 * 60  -- 30 minutes
 
 newProfileCache :: IO ProfileCache
 newProfileCache = newMVar Map.empty
@@ -223,12 +228,13 @@ getProfile
   -> m Profile
 getProfile cache webId' = do
   let key = render webId'
+  now <- liftIO getCurrentTime
   cached <- liftIO $ readMVar cache
   case Map.lookup key cached of
-    Just profile -> do
+    Just (insertedAt, profile) | diffUTCTime now insertedAt < cacheTTL -> do
       logInfoN $ "Using cached profile for " <> key
       pure profile
-    Nothing -> do
+    _ -> do
       profile <- getProfileGraph @RDF.TList webId' >>= parseProfile
-      liftIO $ modifyMVar_ cache (pure . Map.insert key profile)
+      liftIO $ modifyMVar_ cache (pure . Map.insert key (now, profile))
       pure profile
