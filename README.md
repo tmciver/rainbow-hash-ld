@@ -8,36 +8,50 @@ store with metadata stored using **L**inked **D**ata.
 Caldron is developed using [Nix](https://nixos.org/) and currently that is the
 only supported method of building the application.
 
-To build using Nix, run
+To build the application, run
 
-    $ nix-build
+    $ make build
+
+To build and load the Docker image, run
+
+    $ make docker
 
 ## Configuration
 
 ### Server
 
-There are several ways to supply the needed configuration data to the server: a
-config file, environment variables and command line arguments, in order of
-increasing precedence. The following table gives information about configuration
-data.
+The server is configured via environment variables set in `docker-compose.yml`.
+The following table describes the available options.
 
-|Description|Config File Field Name|Environment Variable Name|Command Line Argument Name|Required|Default Value|
-|-----------|----------------|-------------------------|--------------------------|--------|-------------|
-|SPARQL URL - a URL to SPARQL server |`sparql-url`|`SPARQL_URL`|`--sparql-url`|Yes|N/A|
-|Blob Store URL - a URL to a rainbow-hash-compatible file store|`file-store-url`|`FILE_STORE_URL`|`--file-store-url`|Yes|N/A|
-|Network Port|N/A|N/A|`--port`,`-p`|No|80|
-|Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`preferred-host`|`PREFERRED_HOST`|`--preferred-host`|No|Value of `HOST` header|
-|Email-to-WebID Map - a mapping of email address to WebID used to implement "on behalf of" functionalilty (see note below)|`webid-map`|N/A|N/A|No|None|
+|Description|Environment Variable Name|Required|Default Value|
+|-----------|-------------------------|--------|-------------|
+|SPARQL URL - a URL to a SPARQL server|`SPARQL_URL`|Yes|N/A|
+|Blob Store URL - a URL to a rainbow-hash-compatible file store|`FILE_STORE_URL`|Yes|N/A|
+|Hostname - The hostname to use for server-generated URLs; overrides the `HOST` header|`PREFERRED_HOST`|No|Value of `HOST` header|
+
+The default `docker-compose.yml` pre-configures `SPARQL_URL` and `FILE_STORE_URL`
+to point at the bundled Fuseki and rainbow-hash services respectively. Edit those
+values if you are using external services.
+
+### SSL Certificates
+
+The nginx proxy service expects the server certificate and key to be present in
+the project root:
+
+    caldron.timmciver.com.crt
+    caldron.timmciver.com.key
+
+Place your certificate and key files there before starting the stack.
 
 ### CLI Tool
 
-The `caldron` CLI app operates using using the following sub-commands:
+The `caldron` CLI app operates using the following sub-commands:
 
 * `upload <FILE-OR-DIR> <options>`
 * `watch <DIR> <options>`
 
 They both take the same options which can be configured via command line
-arguments and/or a configuration file. The following table gives informaton
+arguments and/or a configuration file. The following table gives information
 about the configuration data:
 
 |Description|Config File Field Name|Command Line Argument Name|Required|Default Value|
@@ -51,27 +65,25 @@ about the configuration data:
 Note that currently this application cannot be used standalone; it must be
 behind a proxy. See the note about authentication below.
 
-Also note that a SPARQL server and a `rainbow-hash`-compatible file store must
-be configured.
+The stack includes all required services (Caldron, Fuseki, rainbow-hash, and an
+nginx proxy) and is managed with Docker Compose.
 
-Once the application is built, you can run it with
+Once the Docker image is built and configuration is in place, start the stack
+with:
 
-    $ ./result/bin/caldron-server \
-      --file-store-url URL \
-      --sparql-url URL
+    $ docker compose up -d
 
-Or, just edit and run `run.sh`:
+To stop the stack:
 
-    $ ./run.sh
+    $ docker compose down
 
-The URL supplied to `--file-store-url` should be a URL to a
-[rainbow-hash](https://github.com/tmciver/rainbow-hash) compatible file store
-and the URL supplied to `--sparql-url` shoulde be a URL to a [SPARQL
-server](https://www.w3.org/TR/sparql11-protocol/) that also supports the [Graph
-Store Protocol](https://www.w3.org/TR/sparql11-http-rdf-update/). Caldron has
-only been tested using [Fuseki](https://jena.apache.org/documentation/fuseki2/).
+Logs can be viewed with:
 
-You can also specify a port with `-p` or `--port`. The default port is 80.
+    $ docker compose logs -f
+
+The SPARQL endpoint is provided by [Fuseki](https://jena.apache.org/documentation/fuseki2/)
+and the blob store by [rainbow-hash](https://github.com/tmciver/rainbow-hash).
+Both are included in the compose stack and their data is persisted under `./data/`.
 
 ## Notes
 
