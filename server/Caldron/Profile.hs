@@ -16,7 +16,6 @@ module Caldron.Profile
 
 import           Protolude
 
-import           Control.Concurrent   (MVar, newMVar, readMVar, modifyMVar_)
 import           Data.Time.Clock      (UTCTime, NominalDiffTime, getCurrentTime,
                                        diffUTCTime)
 import           Control.Monad.Logger (MonadLogger, logDebugN, logErrorN,

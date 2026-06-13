@@ -9,7 +9,6 @@ import Protolude
 
 import qualified Data.ByteString      as BS
 import           System.Directory     (doesFileExist, createDirectoryIfMissing)
-import           System.Exit          (ExitCode (..))
 import           System.FilePath      ((</>))
 import           System.Process       (readProcessWithExitCode)
 import qualified Data.Text            as T
