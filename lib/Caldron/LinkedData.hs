@@ -10,6 +10,7 @@ module Caldron.LinkedData
   , MediaTypeDiscover(..)
   , FileNameGet(..)
   , FileSizeGet(..)
+  , ThumbnailGet(..)
   , Time(..)
   , FileNodeCreateOption(..)
   , FileError(..)
@@ -57,6 +58,7 @@ class Monad m => MetadataPut m where
   putFileMetadata
     :: Text -- ^Hostname from HTTP request
     -> URI -- ^URI of file data in blob storage
+    -> Maybe URI -- ^URI of thumbnail in blob storage
     -> URI -- ^URI of agent creating the file
     -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
     -> Maybe Text -- ^file name. May be unavailable if client calls putFile on ByteString.
@@ -88,12 +90,17 @@ class Monad m => FileNameGet m v where
 class Monad m => FileSizeGet m v where
   getFileSize :: v -> m Integer
 
+class Monad m => ThumbnailGet m v where
+  getThumbnailBytes :: v -> m (Maybe ByteString)
+
 class Monad m => Time m where
   getCurrentTime :: m UTCTime
 
 putFile
   :: ( FileGet m
      , FilePut m v
+     , FilePut m ByteString
+     , ThumbnailGet m v
      , MetadataPut m
      , MediaTypeDiscover m v
      , FileNameGet m v
@@ -147,11 +154,21 @@ putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc subject
 
         logInfoN $ "Added file to store at URL " <> render blobUrl
 
+        -- Generate thumbnail and store it in the blob store.
+        maybeThumbnailUri <- do
+          mBytes <- getThumbnailBytes v
+          case mBytes of
+            Nothing    -> pure Nothing
+            Just bytes -> do
+              thumbUri <- putFileInStore bytes
+              logInfoN $ "Stored thumbnail at " <> render thumbUri
+              pure (Just thumbUri)
+
         -- What is done next depends on the value of fileNodeCreateOption
         case fileNodeCreateOption of
           AlwaysCreate -> do
             logInfoN "User requested creation of a new file node (even if one already exists)."
-            putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc subjects t mt
+            putFileMetadata host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc subjects t mt
               >>= logPutFile blobUrl t mt <&> Right
           CreateIfNotExists -> do
             maybeFileUrl <- getFileForContent blobUrl
@@ -162,7 +179,7 @@ putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc subject
                 pure . Right $ fileUrl'
               Nothing -> do
                 logInfoN "No file object exists for this content; creating a new file object."
-                putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc subjects t mt
+                putFileMetadata host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName' size maybeTitle maybeDesc subjects t mt
                   >>= logPutFile blobUrl t mt <&> Right
 
 updateFileContent

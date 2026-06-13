@@ -24,8 +24,10 @@ import           Control.Monad.Logger          (MonadLogger (..), fromLogStr,
 import           Data.RDF                      (RDF, TList)
 import qualified Data.Text                     as T
 import qualified Data.Time.Clock               as Time
+import qualified Data.ByteString               as BS
 import           System.FilePath               (takeFileName)
-import System.IO (hFileSize)
+import           System.IO                     (hClose, hFileSize)
+import           System.IO.Temp                (withSystemTempFile)
 
 import Caldron.Config            (Config (..))
 import Caldron.HSPARQL           as HSPARQL
@@ -38,6 +40,7 @@ import qualified Caldron.LinkedData as LD
 import RainbowHash.Logger            (writeLog)
 import Caldron.MediaTypeDiscover (discoverMediaTypeFP)
 import Caldron.RDF4H             (fileDataToRDF)
+import qualified Caldron.Thumbnail as Thumbnail
 
 data AppError
   = HTTPClientError HTTPClientError
@@ -65,11 +68,23 @@ instance FilePut AppM FilePath where
     blobStoreUrl' <- asks blobStoreUrl
     mapError HTTPClientError (HTTPClient.putFile blobStoreUrl' fp)
 
+instance FilePut AppM ByteString where
+  putFileInStore bytes = do
+    blobStoreUrl' <- asks blobStoreUrl
+    eitherUri <- liftIO $ withSystemTempFile "caldron-thumb-.jpg" $ \fp h -> do
+      BS.hPut h bytes
+      hClose h
+      runExceptT (HTTPClient.putFile blobStoreUrl' fp :: ExceptT HTTPClientError IO URI)
+    either (throwError . HTTPClientError) pure eitherUri
+
+instance ThumbnailGet AppM FilePath where
+  getThumbnailBytes fp = liftIO $ Thumbnail.generateThumbnailBytes fp
+
 instance MetadataPut AppM where
-  putFileMetadata host blobUrl uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt = do
+  putFileMetadata host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt = do
     logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt
+    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt
 
     -- Debug: print the RDF graph
     -- Why TF do I need to pull out the PrefixMappings and Base URL?

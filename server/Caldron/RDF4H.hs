@@ -26,6 +26,7 @@ fileDataToRDF
   :: (Rdf a)
   => Text
   -> URI -- ^URI to the bytes of the file content.
+  -> Maybe URI -- ^URI of the thumbnail in blob storage.
   -> URI -- ^URI of the agent that uploaded the file.
   -> Maybe URI -- ^URI of the user on whose behalf this file is added (author)
   -> Maybe Text -- ^filename
@@ -36,7 +37,7 @@ fileDataToRDF
   -> UTCTime
   -> MediaType
   -> IO (URI, RDF a)
-fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc subjects time mt = do
+fileDataToRDF host blobUrl maybeThumbnailUri agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc subjects time mt = do
   let baseUrlText = "https://" <> host
 
   fileId <- nextRandom
@@ -127,6 +128,12 @@ fileDataToRDF host blobUrl agentUri maybeOnBehalfOf maybeFileName size maybeTitl
 
         -- Subjects (SKOS Concepts)
         fmap (\subjectUri -> triple fileUriNode (unode "dct:subject") (unode $ render subjectUri)) subjects
+        <>
+
+        -- Thumbnail
+        case maybeThumbnailUri of
+          Just thumbUri -> [triple fileUriNode (unode "fo:thumbnail") (unode $ render thumbUri)]
+          Nothing       -> []
         <>
 
         -- PROV

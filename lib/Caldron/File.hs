@@ -17,4 +17,5 @@ data File = File
   , fileUpdatedAt   :: UTCTime -- will equal fileCreatedAt if it has not been updated after creation.
   , fileContent     :: URI
   , fileSubjects    :: [URI]
+  , fileThumbnail   :: Maybe URI
   }

@@ -13,8 +13,8 @@ import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Network.HTTP.Client as HC
-import           Network.HTTP.Client    (defaultManagerSettings, newManager,
-                                         parseRequest)
+import           Network.HTTP.Client    (defaultManagerSettings, httpLbs, newManager,
+                                         parseRequest, responseBody)
 import           Network.HTTP.Media     (MediaType)
 import           Network.HTTP.ReverseProxy (ProxyDest (..), WaiProxyResponse (..),
                                             defaultOnExc, waiProxyTo)
@@ -33,7 +33,6 @@ import Caldron.Config     (Config (..))
 import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile, fileErrorToText)
 import Caldron.Profile    (ProfileCache)
-import Caldron.Thumbnail  (getThumbnail)
 import Caldron.Servant    (WebIDUserAuth, genAuthServerContext)
 import Caldron.User (User, userWebId)
 import Caldron.View.File  (File (..))
@@ -295,9 +294,6 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond' -> do
                            }
           waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond'
 
-thumbnailCacheDir :: FilePath
-thumbnailCacheDir = "data/thumbnails"
-
 thumbnailHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
 thumbnailHandler config _ mHost fileId = Tagged $ \_ respond' -> do
   let defaultHost = "example.com"
@@ -310,14 +306,16 @@ thumbnailHandler config _ mHost fileId = Tagged $ \_ respond' -> do
       case either' of
         Left _              -> respond' $ responseLBS status500 [] "Error fetching file metadata."
         Right Nothing       -> respond' $ responseLBS status404 [] "File not found."
-        Right (Just rhFile) -> do
-          let contentUrl = render (RH.fileContent rhFile)
-          mThumb <- getThumbnail thumbnailCacheDir fileId contentUrl
-          case mThumb of
-            Nothing    -> respond' $ responseLBS status404 [] "Thumbnail not available for this file type."
-            Just thumb -> respond' $ responseLBS status200
-              [("Content-Type", "image/jpeg")]
-              (LBS.fromStrict thumb)
+        Right (Just rhFile) ->
+          case RH.fileThumbnail rhFile of
+            Nothing       -> respond' $ responseLBS status404 [] "Thumbnail not available for this file."
+            Just thumbUri -> do
+              mgr <- newManager defaultManagerSettings
+              httpReq <- parseRequest (T.unpack $ render thumbUri)
+              resp <- httpLbs httpReq mgr
+              respond' $ responseLBS status200
+                [("Content-Type", "image/jpeg")]
+                (responseBody resp)
 
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ

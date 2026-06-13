@@ -107,7 +107,7 @@ getRecentFiles sparqlEndpoint = do
           :: MonadError HsparqlError m
           => [BindingValue]
           -> m File
-        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV] = do
+        toFile [fileUriBV, fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, thumbnailBV] = do
           fileUri' <- getUri fileUriBV
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
@@ -118,8 +118,9 @@ getRecentFiles sparqlEndpoint = do
           maybeUpdatedAt <- getUpdatedAt updatedBV
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl []
-        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
+          maybeThumbnailUri <- getUriMaybe thumbnailBV
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl [] maybeThumbnailUri
+        toFile l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
 
 getFile :: URI -> URI -> IO (Maybe File)
 getFile sparqlEndpoint fileUriToGet = do
@@ -143,7 +144,7 @@ getFile sparqlEndpoint fileUriToGet = do
           -> [[BindingValue]]
           -> [BindingValue]
           -> m File
-        toFile fileUri' rows [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, _] = do
+        toFile fileUri' rows [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, updatedBV, contentUrlBV, _, thumbnailBV] = do
           maybeFileName <- getPlainLiteralMaybe fileNameBV
           fileSize' <- getFileSize fileSizeBV
           maybeTitle <- getPlainLiteralMaybe titleBV
@@ -154,9 +155,10 @@ getFile sparqlEndpoint fileUriToGet = do
           let updatedAt = fromMaybe createdAt maybeUpdatedAt
           contentUrl <- getUri contentUrlBV
           subjects <- catMaybes <$> mapM subjectFromRow rows
-          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl subjects
-        toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 9
-        subjectFromRow [_, _, _, _, _, _, _, _, subjectBV] = getUriMaybe subjectBV
+          maybeThumbnailUri <- getUriMaybe thumbnailBV
+          pure $ File fileUri' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt updatedAt contentUrl subjects maybeThumbnailUri
+        toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
+        subjectFromRow [_, _, _, _, _, _, _, _, subjectBV, _] = getUriMaybe subjectBV
         subjectFromRow _ = pure Nothing
 
 recentFilesQuery :: Query SelectQuery
@@ -176,6 +178,7 @@ recentFilesQuery = do
   created <- var
   updated <- var
   contentUrl <- var
+  thumbnail <- var
 
   -- where clause
   triple_ fileIri (fo .:. "fileData") fileDataIri
@@ -187,12 +190,13 @@ recentFilesQuery = do
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
+  optional_ (triple_ fileIri (fo .:. "thumbnail") thumbnail)
 
   orderNextDesc created
 
   limit_ 10
 
-  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl]
+  selectVars [fileIri, name, size, title, desc, mediaType, created, updated, contentUrl, thumbnail]
 
 fileQuery :: URI -> Query SelectQuery
 fileQuery fileUri' = do
@@ -211,6 +215,7 @@ fileQuery fileUri' = do
   updated <- var
   contentUrl <- var
   subject <- var
+  thumbnail <- var
 
   -- where clause
   let fileIri = iriRef (render fileUri')
@@ -224,8 +229,9 @@ fileQuery fileUri' = do
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
   optional_ (triple_ fileIri (dct .:. "subject") subject)
+  optional_ (triple_ fileIri (fo .:. "thumbnail") thumbnail)
 
-  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject]
+  selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject, thumbnail]
 
 -- TODO: we probably don't want to fetch all Concepts. Update to fetch concepts based on a search term.
 allConceptsQuery :: Query SelectQuery
