@@ -11,7 +11,6 @@ import           Data.Text.Encoding   as T
 import           Data.Time.Clock      (UTCTime)
 import           Data.Time.Format     (defaultTimeLocale, formatTime)
 import           Lucid
-import           Lucid.Base           (makeAttribute)
 import           Network.HTTP.Media   (MediaType, mainType, subType)
 import           Text.URI             (render)
 
@@ -43,11 +42,13 @@ instance ToHtml [File] where
             label    = fromMaybe (fromMaybe "" (RH.fileName f)) (RH.fileTitle f)
         div_ [classes_ ["col-6", "col-md-4", "col-lg-3", "mb-4"]] $
           div_ [classes_ ["card", "h-100"]] $ do
-            img_ [ src_ (fileLink <> "/thumbnail")
+            let thumbSrc = case RH.fileThumbnail f of
+                  Just _  -> fileLink <> "/thumbnail"
+                  Nothing -> "/static/no-preview.jpg"
+            img_ [ src_ thumbSrc
                  , class_ "card-img-top"
                  , style_ "height: 140px; object-fit: cover;"
                  , alt_ "File thumbnail"
-                 , makeAttribute "onerror" "this.style.display='none'"
                  ]
             div_ [classes_ ["card-body", "p-2"]] $
               h6_ [classes_ ["card-title", "mb-0"]] $
