@@ -8,6 +8,8 @@ module Caldron.RDF4H
 
 import           Protolude
 
+import           Control.Monad.Catch      (MonadThrow)
+
 import qualified Data.Map                 as Map
 import           Data.RDF                 (BaseUrl (..), PrefixMappings (..),
                                            RDF, Rdf, lnode, mkRdf, plainL,
@@ -21,9 +23,8 @@ import           Data.UUID.V4             (nextRandom)
 import           Network.HTTP.Media       (MediaType, renderHeader)
 import           Text.URI                 (URI, mkURI, render)
 
--- TODO: Make this generic. It doesn't appear to need IO.
 fileDataToRDF
-  :: (Rdf a)
+  :: (Rdf a, MonadIO m, MonadThrow m)
   => Text
   -> URI -- ^URI to the bytes of the file content.
   -> Maybe URI -- ^URI of the thumbnail in blob storage.
@@ -36,13 +37,13 @@ fileDataToRDF
   -> [URI] -- ^subjects (SKOS Concepts)
   -> UTCTime
   -> MediaType
-  -> IO (URI, RDF a)
+  -> m (URI, RDF a)
 fileDataToRDF host blobUrl maybeThumbnailUri agentUri maybeOnBehalfOf maybeFileName size maybeTitle maybeDesc subjects time mt = do
   let baseUrlText = "https://" <> host
 
-  fileId <- nextRandom
+  fileId <- liftIO nextRandom
   fileUri <- mkURI $ baseUrlText <> "/file/" <> toText fileId
-  fileDataId <- nextRandom
+  fileDataId <- liftIO nextRandom
   fileDataUri <- mkURI $ baseUrlText <> "/file-data/" <> toText fileDataId
 
   let fileUriNode = unode $ render fileUri

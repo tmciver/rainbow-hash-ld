@@ -84,7 +84,7 @@ instance MetadataPut AppM where
   putFileMetadata host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt = do
     logInfoN "Converting file metadata to RDF"
     -- generate a graph for the resource
-    (url, rdf :: RDF TList) <- liftIO $ fileDataToRDF host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt
+    (url, rdf :: RDF TList) <- fileDataToRDF host blobUrl maybeThumbnailUri uploadedBy maybeAuthor maybeFileName size maybeTitle maybeDesc subjects time mt
 
     -- Debug: print the RDF graph
     -- Why TF do I need to pull out the PrefixMappings and Base URL?
