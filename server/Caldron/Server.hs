@@ -35,7 +35,7 @@ import qualified Caldron.HSPARQL as HSPARQL
 import qualified Caldron.File as RH
 import qualified Caldron.App as App
 import Caldron.Config     (Config (..))
-import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
+import Caldron.LinkedData (FileNodeCreateOption (..), getFile, getFileAtVersion,
                                          getRecentFiles, putFile, fileErrorToText)
 import Caldron.Job        (JobQueue, JobStatus (..), getJobStatus, submitJob)
 import Caldron.Profile    (ProfileCache)
@@ -66,10 +66,12 @@ type FilesAPI =
            Header "Host" Text
         :> Capture "fileId" Text
         :> "content"
+        :> QueryParam "version" Text
         :> Raw
       :<|>
            Header "Host" Text
         :> Capture "fileId" Text
+        :> QueryParam "version" Text
         :> Get '[HTML] File
       :<|>
            -- This endpoint is for use by the web form used to update a file as
@@ -90,6 +92,7 @@ type FilesAPI =
            Header "Host" Text
         :> Capture "fileId" Text
         :> "thumbnail"
+        :> QueryParam "version" Text
         :> Raw
       )
     :<|> "jobs"  :> Capture "jobId" Text :> Get '[JSON] JobStatusResponse
@@ -111,8 +114,8 @@ homeHandler config user = do
     Left err          -> throwError $ err500 { errBody = errToLBS err }
     Right recentFiles -> pure $ Home user ((\f -> File f []) <$> recentFiles)
 
-getFileHandler :: Config -> User -> Maybe Text -> Text -> Handler File
-getFileHandler config _ mHost fileId =
+getFileHandler :: Config -> User -> Maybe Text -> Text -> Maybe Text -> Handler File
+getFileHandler config _ mHost fileId mVersion =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "https://" <> host <> "/file/" <> fileId
@@ -120,7 +123,14 @@ getFileHandler config _ mHost fileId =
     Nothing -> throwError $ err400 { errBody = "Could not construct a valid URI for file." }
     Just fileUri -> do
       liftIO $ writeLog LevelInfo $ "Getting file: " <> uriText
-      either' <- liftIO $ runApp (getFile fileUri) config
+      let lookupFile = case mVersion of
+            Nothing  -> getFile fileUri
+            Just vid ->
+              let fileDataUriText = "https://" <> host <> "/file-data/" <> vid
+              in case mkURI fileDataUriText of
+                Nothing          -> getFile fileUri
+                Just fileDataUri -> getFileAtVersion fileUri fileDataUri
+      either' <- liftIO $ runApp lookupFile config
       case either' of
         Left err             -> throwError $ err500 { errBody = errToLBS err }
         Right Nothing        -> throwError err404
@@ -303,15 +313,22 @@ filesHandler config jobQueue user mAccept mHost mFrom multipartData = do
                 boolToFNCO True  = AlwaysCreate
                 boolToFNCO False = CreateIfNotExists
 
-fileContentHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
-fileContentHandler config _ mHost fileId = Tagged $ \req respond' -> do
+fileContentHandler :: Config -> User -> Maybe Text -> Text -> Maybe Text -> Tagged Handler Application
+fileContentHandler config _ mHost fileId mVersion = Tagged $ \req respond' -> do
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "https://" <> host <> "/file/" <> fileId
   case mkURI uriText of
     Nothing -> respond' $ responseLBS status400 [] "Could not construct a valid URI for file."
     Just fileUri -> do
-      either' <- runApp (getFile fileUri) config
+      let lookupFile = case mVersion of
+            Nothing  -> getFile fileUri
+            Just vid ->
+              let fileDataUriText = "https://" <> host <> "/file-data/" <> vid
+              in case mkURI fileDataUriText of
+                Nothing          -> getFile fileUri
+                Just fileDataUri -> getFileAtVersion fileUri fileDataUri
+      either' <- runApp lookupFile config
       case either' of
         Left _          -> respond' $ responseLBS status500 [] "Error fetching file metadata."
         Right Nothing   -> respond' $ responseLBS status404 [] "File not found."
@@ -329,15 +346,22 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond' -> do
                            }
           waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond'
 
-thumbnailHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
-thumbnailHandler config _ mHost fileId = Tagged $ \_ respond' -> do
+thumbnailHandler :: Config -> User -> Maybe Text -> Text -> Maybe Text -> Tagged Handler Application
+thumbnailHandler config _ mHost fileId mVersion = Tagged $ \_ respond' -> do
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ preferredHost config <|> mHost
       uriText = "https://" <> host <> "/file/" <> fileId
   case mkURI uriText of
     Nothing -> respond' $ responseLBS status400 [] "Invalid file URI."
     Just fileUri -> do
-      either' <- runApp (getFile fileUri) config
+      let lookupFile = case mVersion of
+            Nothing  -> getFile fileUri
+            Just vid ->
+              let fileDataUriText = "https://" <> host <> "/file-data/" <> vid
+              in case mkURI fileDataUriText of
+                Nothing          -> getFile fileUri
+                Just fileDataUri -> getFileAtVersion fileUri fileDataUri
+      either' <- runApp lookupFile config
       case either' of
         Left _              -> respond' $ responseLBS status500 [] "Error fetching file metadata."
         Right Nothing       -> respond' $ responseLBS status404 [] "File not found."

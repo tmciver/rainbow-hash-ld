@@ -8,6 +8,7 @@ module Caldron.HSPARQL
   ( getRecentFiles
   , getFileForContent
   , getFile
+  , getFileAtVersion
   , searchConcepts
   , getConceptsByUris
   , mintAndCreateConcept
@@ -160,6 +161,74 @@ getFile sparqlEndpoint fileUriToGet = do
         toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
         subjectFromRow [_, _, _, _, _, _, _, _, subjectBV, _] = getUriMaybe subjectBV
         subjectFromRow _ = pure Nothing
+
+getFileAtVersion :: URI -> URI -> URI -> IO (Maybe File)
+getFileAtVersion sparqlEndpoint fileUri' fileDataUri' = do
+  let query = fileAtVersionQuery fileUri' fileDataUri'
+  writeLog LevelDebug (pack . createSelectQuery $ query)
+
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint) <> "/query") query
+
+  writeLog LevelDebug (show maybeBvss)
+
+  pure $ case maybeBvss of
+    Nothing          -> Nothing
+    Just []          -> Nothing
+    Just rows@(firstRow:_) -> hush $ toFile fileUri' rows firstRow
+
+  where toFile
+          :: MonadError HsparqlError m
+          => URI
+          -> [[BindingValue]]
+          -> [BindingValue]
+          -> m File
+        toFile fileUri'' rows [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, versionCreatedBV, contentUrlBV, _, thumbnailBV] = do
+          maybeFileName   <- getPlainLiteralMaybe fileNameBV
+          fileSize'       <- getFileSize fileSizeBV
+          maybeTitle      <- getPlainLiteralMaybe titleBV
+          maybeDesc       <- getPlainLiteralMaybe descBV
+          mediaType       <- getMediaType mediaTypeBV
+          createdAt       <- getCreatedAt createdBV
+          versionCreated  <- getCreatedAt versionCreatedBV
+          contentUrl      <- getUri contentUrlBV
+          subjects        <- catMaybes <$> mapM subjectFromRow rows
+          maybeThumbnail  <- getUriMaybe thumbnailBV
+          pure $ File fileUri'' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt versionCreated contentUrl subjects maybeThumbnail
+        toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
+        subjectFromRow [_, _, _, _, _, _, _, _, subjectBV, _] = getUriMaybe subjectBV
+        subjectFromRow _ = pure Nothing
+
+fileAtVersionQuery :: URI -> URI -> Query SelectQuery
+fileAtVersionQuery fileUri' fileDataUri' = do
+  fo  <- prefix "fo"  (iriRef "http://timmciver.com/file-ontology#")
+  dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
+
+  name           <- var
+  size           <- var
+  title          <- var
+  desc           <- var
+  mediaType      <- var
+  created        <- var
+  versionCreated <- var
+  contentUrl     <- var
+  subject        <- var
+  thumbnail      <- var
+
+  let fileIri     = iriRef (render fileUri')
+      fileDataIri = iriRef (render fileDataUri')
+
+  optional_ (triple_ fileIri     (fo  .:. "fileName")    name)
+  optional_ (triple_ fileIri     (dct .:. "title")       title)
+  optional_ (triple_ fileIri     (dct .:. "description") desc)
+  triple_            fileIri     (dct .:. "format")      mediaType
+  triple_            fileIri     (dct .:. "created")     created
+  triple_            fileDataIri (fo  .:. "contentUrl")  contentUrl
+  triple_            fileDataIri (fo  .:. "size")        size
+  triple_            fileDataIri (dct .:. "created")     versionCreated
+  optional_ (triple_ fileIri     (dct .:. "subject")     subject)
+  optional_ (triple_ fileDataIri (fo  .:. "thumbnail")   thumbnail)
+
+  selectVars [name, size, title, desc, mediaType, created, versionCreated, contentUrl, subject, thumbnail]
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do
