@@ -51,6 +51,7 @@ class Monad m => FilePut m v where
 
 class Monad m => FileGet m where
   getFile :: URI -> m (Maybe File)
+  getFileAtVersion :: URI -> URI -> m (Maybe File) -- ^file URI, fileData URI
   getRecentFiles :: m [File]
   getFileForContent :: URI -> m (Maybe URI)
 

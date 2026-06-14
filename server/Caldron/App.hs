@@ -60,6 +60,7 @@ runApp (AppM except) = runReaderT (runExceptT except)
 
 instance FileGet AppM where
   getFile fileUri = asks sparqlEndpoint >>= liftIO . flip HSPARQL.getFile fileUri
+  getFileAtVersion fileUri fileDataUri = asks sparqlEndpoint >>= liftIO . \ep -> HSPARQL.getFileAtVersion ep fileUri fileDataUri
   getRecentFiles = asks sparqlEndpoint >>= liftIO . HSPARQL.getRecentFiles
   getFileForContent contentUrl = asks sparqlEndpoint >>= liftIO . HSPARQL.getFileForContent contentUrl
 

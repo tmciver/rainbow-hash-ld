@@ -8,6 +8,8 @@ module Caldron.HSPARQL
   ( getRecentFiles
   , getFileForContent
   , getFile
+  , getFileAtVersion
+  , getRevisionHistory
   , searchConcepts
   , getConceptsByUris
   , mintAndCreateConcept
@@ -28,6 +30,9 @@ import qualified Data.ByteString.Lazy                  as LBS
 import           Network.HTTP.Client                   (Request, RequestBody(RequestBodyBS), Response, requestHeaders, requestBody, defaultManagerSettings, newManager, httpLbs, responseStatus, responseBody, parseRequest)
 import           Network.HTTP.Types                    (Status, statusIsSuccessful)
 import           Control.Monad.Logger            (LogLevel (LevelDebug, LevelError))
+import           Data.Aeson                      (FromJSON (..), decode,
+                                                  withObject, (.:))
+import qualified Data.Map.Strict                 as Map
 import           Data.RDF                        (LValue (..), Node (..))
 import           Data.Text                       (pack, unpack)
 import           Data.Time                       (UTCTime)
@@ -43,7 +48,7 @@ import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
 import Caldron.Concept             (Concept (..))
-import Caldron.File                (File (..))
+import Caldron.File                (File (..), FileRevision (..))
 import RainbowHash.Logger              (writeLog)
 
 data HsparqlError
@@ -160,6 +165,139 @@ getFile sparqlEndpoint fileUriToGet = do
         toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
         subjectFromRow [_, _, _, _, _, _, _, _, subjectBV, _] = getUriMaybe subjectBV
         subjectFromRow _ = pure Nothing
+
+getFileAtVersion :: URI -> URI -> URI -> IO (Maybe File)
+getFileAtVersion sparqlEndpoint fileUri' fileDataUri' = do
+  let query = fileAtVersionQuery fileUri' fileDataUri'
+  writeLog LevelDebug (pack . createSelectQuery $ query)
+
+  maybeBvss <- selectQuery (unpack (render sparqlEndpoint) <> "/query") query
+
+  writeLog LevelDebug (show maybeBvss)
+
+  pure $ case maybeBvss of
+    Nothing          -> Nothing
+    Just []          -> Nothing
+    Just rows@(firstRow:_) -> hush $ toFile fileUri' rows firstRow
+
+  where toFile
+          :: MonadError HsparqlError m
+          => URI
+          -> [[BindingValue]]
+          -> [BindingValue]
+          -> m File
+        toFile fileUri'' rows [fileNameBV, fileSizeBV, titleBV, descBV, mediaTypeBV, createdBV, versionCreatedBV, contentUrlBV, _, thumbnailBV] = do
+          maybeFileName   <- getPlainLiteralMaybe fileNameBV
+          fileSize'       <- getFileSize fileSizeBV
+          maybeTitle      <- getPlainLiteralMaybe titleBV
+          maybeDesc       <- getPlainLiteralMaybe descBV
+          mediaType       <- getMediaType mediaTypeBV
+          createdAt       <- getCreatedAt createdBV
+          versionCreated  <- getCreatedAt versionCreatedBV
+          contentUrl      <- getUri contentUrlBV
+          subjects        <- catMaybes <$> mapM subjectFromRow rows
+          maybeThumbnail  <- getUriMaybe thumbnailBV
+          pure $ File fileUri'' maybeFileName fileSize' maybeTitle maybeDesc mediaType createdAt versionCreated contentUrl subjects maybeThumbnail
+        toFile _ _ l = throwError $ BindingValueError $ BindingValueCountError (fromIntegral $ length l) 10
+        subjectFromRow [_, _, _, _, _, _, _, _, subjectBV, _] = getUriMaybe subjectBV
+        subjectFromRow _ = pure Nothing
+
+fileAtVersionQuery :: URI -> URI -> Query SelectQuery
+fileAtVersionQuery fileUri' fileDataUri' = do
+  fo  <- prefix "fo"  (iriRef "http://timmciver.com/file-ontology#")
+  dct <- prefix "dct" (iriRef "http://purl.org/dc/terms/")
+
+  name           <- var
+  size           <- var
+  title          <- var
+  desc           <- var
+  mediaType      <- var
+  created        <- var
+  versionCreated <- var
+  contentUrl     <- var
+  subject        <- var
+  thumbnail      <- var
+
+  let fileIri     = iriRef (render fileUri')
+      fileDataIri = iriRef (render fileDataUri')
+
+  optional_ (triple_ fileIri     (fo  .:. "fileName")    name)
+  optional_ (triple_ fileIri     (dct .:. "title")       title)
+  optional_ (triple_ fileIri     (dct .:. "description") desc)
+  triple_            fileIri     (dct .:. "format")      mediaType
+  triple_            fileIri     (dct .:. "created")     created
+  triple_            fileDataIri (fo  .:. "contentUrl")  contentUrl
+  triple_            fileDataIri (fo  .:. "size")        size
+  triple_            fileDataIri (dct .:. "created")     versionCreated
+  optional_ (triple_ fileIri     (dct .:. "subject")     subject)
+  optional_ (triple_ fileDataIri (fo  .:. "thumbnail")   thumbnail)
+
+  selectVars [name, size, title, desc, mediaType, created, versionCreated, contentUrl, subject, thumbnail]
+
+-- | Minimal Aeson types for parsing SPARQL JSON results.
+newtype SparqlValue = SparqlValue { svValue :: Text }
+
+instance FromJSON SparqlValue where
+  parseJSON = withObject "SparqlValue" $ \o -> SparqlValue <$> o .: "value"
+
+newtype SparqlResults = SparqlResults [Map.Map Text SparqlValue]
+
+instance FromJSON SparqlResults where
+  parseJSON = withObject "SparqlResults" $ \o -> do
+    results <- o .: "results"
+    SparqlResults <$> results .: "bindings"
+
+-- | Fetch all revisions of a file by following the fo:previousRevision chain.
+-- Uses a raw SPARQL property path query since hsparql's DSL does not support them.
+-- Results are ordered newest-first.
+getRevisionHistory :: URI -> URI -> IO [FileRevision]
+getRevisionHistory sparqlEndpoint' fileUri' = do
+  let queryText = revisionHistoryQuery fileUri'
+      reqText   = "POST " <> T.unpack (render sparqlEndpoint') <> "/query"
+  case parseRequest reqText of
+    Nothing  -> pure []
+    Just req -> do
+      let req' = req
+            { requestHeaders = [ ("Content-Type", "application/sparql-query")
+                               , ("Accept",       "application/sparql-results+json")
+                               ]
+            , requestBody    = RequestBodyBS $ T.encodeUtf8 queryText
+            }
+      mgr  <- newManager defaultManagerSettings
+      resp <- httpLbs req' mgr
+      case decode (responseBody resp) of
+        Nothing                      -> pure []
+        Just (SparqlResults bindings) -> pure $ mapMaybe toRevision bindings
+  where
+    toRevision binding = do
+      uriText        <- svValue <$> Map.lookup "fileDataUri" binding
+      createdText    <- svValue <$> Map.lookup "created"     binding
+      sizeText       <- svValue <$> Map.lookup "size"        binding
+      contentUrlText <- svValue <$> Map.lookup "contentUrl"  binding
+      uri            <- mkURI uriText
+      created        <- iso8601ParseM (T.unpack createdText)
+      size           <- readMaybe sizeText
+      contentUrl     <- mkURI contentUrlText
+      pure $ FileRevision uri created size contentUrl
+
+revisionHistoryQuery :: URI -> Text
+revisionHistoryQuery fileUri' =
+  "PREFIX fo: <http://timmciver.com/file-ontology#>\n\
+  \PREFIX dct: <http://purl.org/dc/terms/>\n\
+  \SELECT ?fileDataUri ?created ?size ?contentUrl\n\
+  \WHERE {\n\
+  \  {\n\
+  \    <" <> render fileUri' <> "> fo:fileData ?fileDataUri .\n\
+  \  }\n\
+  \  UNION\n\
+  \  {\n\
+  \    <" <> render fileUri' <> "> fo:fileData/fo:previousRevision+ ?fileDataUri .\n\
+  \  }\n\
+  \  ?fileDataUri dct:created ?created ;\n\
+  \               fo:size ?size ;\n\
+  \               fo:contentUrl ?contentUrl .\n\
+  \}\n\
+  \ORDER BY DESC(?created)"
 
 recentFilesQuery :: Query SelectQuery
 recentFilesQuery = do

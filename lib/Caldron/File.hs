@@ -1,10 +1,17 @@
-module Caldron.File (File(..)) where
+module Caldron.File (File(..), FileRevision(..)) where
 
 import           Protolude
 
 import           Data.Time.Clock    (UTCTime)
 import           Network.HTTP.Media (MediaType)
 import           Text.URI           (URI)
+
+data FileRevision = FileRevision
+  { revisionUri        :: URI
+  , revisionCreated    :: UTCTime
+  , revisionSize       :: Integer
+  , revisionContentUrl :: URI
+  }
 
 data File = File
   { fileUri         :: URI
