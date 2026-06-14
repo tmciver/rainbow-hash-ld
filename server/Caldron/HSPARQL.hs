@@ -270,19 +270,21 @@ getRevisionHistory sparqlEndpoint' fileUri' = do
         Just (SparqlResults bindings) -> pure $ mapMaybe toRevision bindings
   where
     toRevision binding = do
-      uriText     <- svValue <$> Map.lookup "fileDataUri" binding
-      createdText <- svValue <$> Map.lookup "created"     binding
-      sizeText    <- svValue <$> Map.lookup "size"        binding
-      uri         <- mkURI uriText
-      created     <- iso8601ParseM (T.unpack createdText)
-      size        <- readMaybe sizeText
-      pure $ FileRevision uri created size
+      uriText        <- svValue <$> Map.lookup "fileDataUri" binding
+      createdText    <- svValue <$> Map.lookup "created"     binding
+      sizeText       <- svValue <$> Map.lookup "size"        binding
+      contentUrlText <- svValue <$> Map.lookup "contentUrl"  binding
+      uri            <- mkURI uriText
+      created        <- iso8601ParseM (T.unpack createdText)
+      size           <- readMaybe sizeText
+      contentUrl     <- mkURI contentUrlText
+      pure $ FileRevision uri created size contentUrl
 
 revisionHistoryQuery :: URI -> Text
 revisionHistoryQuery fileUri' =
   "PREFIX fo: <http://timmciver.com/file-ontology#>\n\
   \PREFIX dct: <http://purl.org/dc/terms/>\n\
-  \SELECT ?fileDataUri ?created ?size\n\
+  \SELECT ?fileDataUri ?created ?size ?contentUrl\n\
   \WHERE {\n\
   \  {\n\
   \    <" <> render fileUri' <> "> fo:fileData ?fileDataUri .\n\
@@ -292,7 +294,8 @@ revisionHistoryQuery fileUri' =
   \    <" <> render fileUri' <> "> fo:fileData/fo:previousRevision+ ?fileDataUri .\n\
   \  }\n\
   \  ?fileDataUri dct:created ?created ;\n\
-  \               fo:size ?size .\n\
+  \               fo:size ?size ;\n\
+  \               fo:contentUrl ?contentUrl .\n\
   \}\n\
   \ORDER BY DESC(?created)"
 

@@ -74,9 +74,12 @@ instance ToHtml File where
       div_ [class_ "container-fluid", style_ "height: calc(100vh - 56px)"] $
         div_ [classes_ ["row", "no-gutters", "h-100"]] $ do
           div_ [classes_ ["col-md-8", "h-100"]] $
-            iframe_ [ src_ (render (RH.fileUri f) <> "/content")
-                    , style_ "width: 100%; height: 100%; border: 0;"
-                    ] (toHtml ("" :: Text))
+            let versionParam = case find (\r -> RH.revisionContentUrl r == RH.fileContent f) revisions of
+                  Just r  -> "?version=" <> T.takeWhileEnd (/= '/') (render (RH.revisionUri r))
+                  Nothing -> ""
+            in iframe_ [ src_ (render (RH.fileUri f) <> "/content" <> versionParam)
+                       , style_ "width: 100%; height: 100%; border: 0;"
+                       ] (toHtml ("" :: Text))
           div_ [classes_ ["col-md-4", "h-100", "overflow-auto", "border-left", "p-3"]] $ do
             div_ [classes_ ["card", "mb-3"]] $ do
               div_ [class_ "card-header"] $ strong_ "Metadata"
@@ -123,7 +126,7 @@ instance ToHtml File where
                       forM_ revisions $ \r -> do
                         let uuid    = T.takeWhileEnd (/= '/') (render (RH.revisionUri r))
                             href    = render (RH.fileUri f) <> "?version=" <> uuid
-                            isCurrent = RH.revisionCreated r == RH.fileUpdatedAt f
+                            isCurrent = RH.revisionContentUrl r == RH.fileContent f
                         tr_ $ do
                           td_ $ do
                             a_ [href_ href] (toHtml $ showUTCTime (RH.revisionCreated r))

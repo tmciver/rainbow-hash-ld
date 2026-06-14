@@ -7,9 +7,10 @@ import           Network.HTTP.Media (MediaType)
 import           Text.URI           (URI)
 
 data FileRevision = FileRevision
-  { revisionUri     :: URI
-  , revisionCreated :: UTCTime
-  , revisionSize    :: Integer
+  { revisionUri        :: URI
+  , revisionCreated    :: UTCTime
+  , revisionSize       :: Integer
+  , revisionContentUrl :: URI
   }
 
 data File = File
