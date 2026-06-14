@@ -6,7 +6,7 @@ module Main where
 
 import           Protolude
 
-import           System.IO                (hSetBuffering, stdout, stderr, BufferMode (LineBuffering))
+import           System.IO                (hSetBuffering, BufferMode (LineBuffering))
 import           Network.Wai.Handler.Warp (run)
 import           Options.Applicative      (execParser)
 import           Text.URI                 (render)

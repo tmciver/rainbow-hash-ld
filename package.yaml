@@ -42,6 +42,7 @@ executables:
     source-dirs: server
     other-modules:
       - Caldron.App
+      - Caldron.Concept
       - Caldron.Config
       - Caldron.Crypto
       - Caldron.HSPARQL
@@ -54,6 +55,7 @@ executables:
       - Caldron.Servant
       - Caldron.Server
       - Caldron.User
+      - Caldron.Thumbnail
       - Caldron.View.File
       - Caldron.View.HTML
       - Caldron.View.Home
@@ -82,6 +84,7 @@ executables:
       - mustache
       - optparse-applicative
       - parsec
+      - process
       - rainbow-hash
       - caldron
       - random

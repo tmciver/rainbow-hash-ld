@@ -11,17 +11,15 @@ import           Protolude              hiding (Handler)
 import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
-import           Data.Tagged            (Tagged (..))
 import qualified Data.Text as T
-import           Data.Text.Encoding     (decodeUtf8)
 import qualified Network.HTTP.Client as HC
-import           Network.HTTP.Client    (defaultManagerSettings, newManager,
-                                         parseRequest)
+import           Network.HTTP.Client    (defaultManagerSettings, httpLbs, newManager,
+                                         parseRequest, responseBody)
 import           Network.HTTP.Media     (MediaType)
 import           Network.HTTP.ReverseProxy (ProxyDest (..), WaiProxyResponse (..),
                                             defaultOnExc, waiProxyTo)
-import           Network.HTTP.Types     (status400, status404, status500)
-import           Network.Wai            (Application, responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
+import           Network.HTTP.Types     (status200, status400, status404, status500)
+import           Network.Wai            (responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
 import           Servant                hiding (URI)
 import           Servant.Multipart
 import           Text.URI               (URI, mkURI, render)
@@ -41,7 +39,6 @@ import Caldron.View.File  (File (..))
 import Caldron.View.Home  (Home (..))
 import Caldron.View.HTML  (HTML)
 import Caldron.EmailAddress (EmailAddress(..))
-import qualified Caldron.Concept as Concept
 import Caldron.Concept (Concept)
 
 type FilesAPI =
@@ -76,6 +73,11 @@ type FilesAPI =
         :> Capture "fileId" Text
         :> MultipartForm Tmp (MultipartData Tmp)
         :> PutNoContent
+      :<|>
+           Header "Host" Text
+        :> Capture "fileId" Text
+        :> "thumbnail"
+        :> Raw
       )
     :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
   )
@@ -267,17 +269,17 @@ filesHandler config user mHost mFrom multipartData = do
                 boolToFNCO False = CreateIfNotExists
 
 fileContentHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
-fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
+fileContentHandler config _ mHost fileId = Tagged $ \req respond' -> do
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "https://" <> host <> "/file/" <> fileId
   case mkURI uriText of
-    Nothing -> respond $ responseLBS status400 [] "Could not construct a valid URI for file."
+    Nothing -> respond' $ responseLBS status400 [] "Could not construct a valid URI for file."
     Just fileUri -> do
       either' <- runApp (getFile fileUri) config
       case either' of
-        Left _          -> respond $ responseLBS status500 [] "Error fetching file metadata."
-        Right Nothing   -> respond $ responseLBS status404 [] "File not found."
+        Left _          -> respond' $ responseLBS status500 [] "Error fetching file metadata."
+        Right Nothing   -> respond' $ responseLBS status404 [] "File not found."
         Right (Just rhFile) -> do
           let contentUrl = T.unpack (render (RH.fileContent rhFile))
           writeLog LevelInfo $ render (RH.fileContent rhFile)
@@ -290,7 +292,30 @@ fileContentHandler config _ mHost fileId = Tagged $ \req respond -> do
                            , rawQueryString = ""
                            , queryString    = []
                            }
-          waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond
+          waiProxyTo (\_ -> pure $ WPRModifiedRequest modReq dest) defaultOnExc mgr req respond'
+
+thumbnailHandler :: Config -> User -> Maybe Text -> Text -> Tagged Handler Application
+thumbnailHandler config _ mHost fileId = Tagged $ \_ respond' -> do
+  let defaultHost = "example.com"
+      host = fromMaybe defaultHost $ preferredHost config <|> mHost
+      uriText = "https://" <> host <> "/file/" <> fileId
+  case mkURI uriText of
+    Nothing -> respond' $ responseLBS status400 [] "Invalid file URI."
+    Just fileUri -> do
+      either' <- runApp (getFile fileUri) config
+      case either' of
+        Left _              -> respond' $ responseLBS status500 [] "Error fetching file metadata."
+        Right Nothing       -> respond' $ responseLBS status404 [] "File not found."
+        Right (Just rhFile) ->
+          case RH.fileThumbnail rhFile of
+            Nothing       -> respond' $ responseLBS status404 [] "Thumbnail not available for this file."
+            Just thumbUri -> do
+              mgr <- newManager defaultManagerSettings
+              httpReq <- parseRequest (T.unpack $ render thumbUri)
+              resp <- httpLbs httpReq mgr
+              respond' $ responseLBS status200
+                [("Content-Type", "image/jpeg")]
+                (responseBody resp)
 
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
@@ -310,7 +335,9 @@ server config = (\authedUser -> homeHandler config authedUser
                         -- PUTs from programmatic clients will use the below PUT handler
                         postFileHandler config authedUser
                         :<|>
-                        putFileHandler config authedUser)
+                        putFileHandler config authedUser
+                        :<|>
+                        thumbnailHandler config authedUser)
                   :<|> conceptsHandler config)
                 :<|> staticHandler
 
