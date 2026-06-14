@@ -6,8 +6,8 @@ import           Protolude hiding (for_)
 
 import qualified Data.CaseInsensitive as CI
 
-import           Data.Text            as T
-import           Data.Text.Encoding   as T
+import qualified Data.Text            as T
+import qualified Data.Text.Encoding   as T
 import           Data.Time.Clock      (UTCTime)
 import           Data.Time.Format     (defaultTimeLocale, formatTime)
 import           Lucid
@@ -18,7 +18,7 @@ import           Caldron.Concept  (Concept)
 import qualified Caldron.Concept  as Concept
 import qualified Caldron.File     as RH
 
-data File = File RH.File [Concept]
+data File = File RH.File [Concept] [RH.FileRevision]
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -37,7 +37,7 @@ instance ToHtml [File] where
   toHtml files = do
     h2_ [classes_ ["mt-4", "mb-3"]] "Recent Files"
     div_ [class_ "row"] $
-      forM_ files $ \(File f _) -> do
+      forM_ files $ \(File f _ _) -> do
         let fileLink = render (RH.fileUri f)
             label    = fromMaybe (fromMaybe "" (RH.fileName f)) (RH.fileTitle f)
         div_ [classes_ ["col-6", "col-md-4", "col-lg-3", "mb-4"]] $
@@ -62,7 +62,7 @@ instance ToHtml [File] where
 -- Single-file view page
 
 instance ToHtml File where
-  toHtml (File f concepts) = html_ $ do
+  toHtml (File f concepts revisions) = html_ $ do
     head_ $ do
       meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1, shrink-to-fit=no"]
       title_ (toHtml (fromMaybe "File" (RH.fileTitle f) <> " — Caldron"))
@@ -95,7 +95,7 @@ instance ToHtml File where
                       td_ $ forM_ (RH.fileSubjects f) $ \uri ->
                         let label = maybe (render uri) Concept.conceptPrefLabel (Concept.lookupConcept concepts uri)
                         in a_ [href_ (render uri), classes_ ["badge", "badge-pill", "badge-info", "mr-1"]] (toHtml label)
-            div_ [class_ "card"] $ do
+            div_ [classes_ ["card", "mb-3"]] $ do
               div_ [class_ "card-header"] $ strong_ "Upload New Content"
               div_ [class_ "card-body"] $
                 form_
@@ -111,6 +111,25 @@ instance ToHtml File where
                            , class_ "form-control-file"
                            ]
                   button_ [type_ "submit", classes_ ["btn", "btn-primary", "btn-sm"]] "Submit"
+            when (not $ null revisions) $
+              div_ [class_ "card"] $ do
+                div_ [class_ "card-header"] $ strong_ "Revision History"
+                div_ [classes_ ["card-body", "p-0"]] $
+                  table_ [classes_ ["table", "table-sm", "table-bordered", "mb-0"]] $ do
+                    thead_ $ tr_ $ do
+                      th_ "Date"
+                      th_ "Size (bytes)"
+                    tbody_ $
+                      forM_ revisions $ \r -> do
+                        let uuid    = T.takeWhileEnd (/= '/') (render (RH.revisionUri r))
+                            href    = render (RH.fileUri f) <> "?version=" <> uuid
+                            isCurrent = RH.revisionCreated r == RH.fileUpdatedAt f
+                        tr_ $ do
+                          td_ $ do
+                            a_ [href_ href] (toHtml $ showUTCTime (RH.revisionCreated r))
+                            when isCurrent $
+                              span_ [classes_ ["badge", "badge-primary", "ml-2"]] "current"
+                          td_ (toHtml $ (show :: Integer -> Text) (RH.revisionSize r))
 
     where metaRow :: Monad m => Text -> Text -> HtmlT m ()
           metaRow lbl val = tr_ $ do

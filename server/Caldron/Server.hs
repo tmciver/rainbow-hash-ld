@@ -26,7 +26,7 @@ import           System.IO              (openTempFile, hClose)
 import           System.IO.Temp         ()
 import           Network.Wai            (responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
 import           Servant                hiding (URI)
-import           Servant.Multipart
+import           Servant.Multipart hiding (lookupFile)
 import           Text.URI               (URI, mkURI, render)
 
 import RainbowHash.Logger            (writeLog)
@@ -112,7 +112,7 @@ homeHandler config user = do
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home user ((\f -> File f []) <$> recentFiles)
+    Right recentFiles -> pure $ Home user ((\f -> File f [] []) <$> recentFiles)
 
 getFileHandler :: Config -> User -> Maybe Text -> Text -> Maybe Text -> Handler File
 getFileHandler config _ mHost fileId mVersion =
@@ -135,8 +135,9 @@ getFileHandler config _ mHost fileId mVersion =
         Left err             -> throwError $ err500 { errBody = errToLBS err }
         Right Nothing        -> throwError err404
         Right (Just rhFile) -> do
-          concepts <- liftIO $ HSPARQL.getConceptsByUris (sparqlEndpoint config) (RH.fileSubjects rhFile)
-          pure $ File rhFile concepts
+          concepts   <- liftIO $ HSPARQL.getConceptsByUris    (sparqlEndpoint config) (RH.fileSubjects rhFile)
+          revisions  <- liftIO $ HSPARQL.getRevisionHistory   (sparqlEndpoint config) (RH.fileUri rhFile)
+          pure $ File rhFile concepts revisions
 
 webIdFromEmail :: EmailAddress -> Config -> Maybe URI
 webIdFromEmail email = Map.lookup email . webIdMap
