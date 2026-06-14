@@ -133,7 +133,7 @@ fileDataToRDF host blobUrl maybeThumbnailUri agentUri maybeOnBehalfOf maybeFileN
 
         -- Thumbnail
         case maybeThumbnailUri of
-          Just thumbUri -> [triple fileUriNode (unode "fo:thumbnail") (unode $ render thumbUri)]
+          Just thumbUri -> [triple fileDataUriNode (unode "fo:thumbnail") (unode $ render thumbUri)]
           Nothing       -> []
         <>
 

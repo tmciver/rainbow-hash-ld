@@ -79,6 +79,7 @@ class Monad m => MetadataPut m where
     -> Maybe Text -- ^file name
     -> Integer    -- ^file size
     -> UTCTime -- ^file creation time
+    -> Maybe URI -- ^URI of thumbnail in blob storage
     -> m ()
 
 class Monad m => MediaTypeDiscover m v where
@@ -185,6 +186,8 @@ putFile v host uploadedBy maybeAuthor maybeFileName maybeTitle maybeDesc subject
 updateFileContent
   :: ( FileGet m
      , FilePut m v
+     , FilePut m ByteString
+     , ThumbnailGet m v
      , MetadataPut m
      , MediaTypeDiscover m v
      , FileNameGet m v
@@ -233,7 +236,18 @@ updateFileContent host fileUri v createdByUri maybeOnBehalfOf maybeMT = do
           if blobUrl /= fileContent file
             then do
               logInfoN $ "Added file to store at URL " <> render blobUrl
-              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri maybeOnBehalfOf (fileName file) size t
+
+              -- Generate thumbnail and store it in the blob store.
+              maybeThumbnailUri <- do
+                mBytes <- getThumbnailBytes v
+                case mBytes of
+                  Nothing    -> pure Nothing
+                  Just bytes -> do
+                    thumbUri <- putFileInStore bytes
+                    logInfoN $ "Stored thumbnail at " <> render thumbUri
+                    pure (Just thumbUri)
+
+              Right <$> updateFileGraphWithContent host fileUri blobUrl createdByUri maybeOnBehalfOf (fileName file) size t maybeThumbnailUri
             else
               Right <$> (logInfoN $ "While updating file " <> render fileUri <> ", its content was found to be unchanged")
 

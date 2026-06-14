@@ -101,8 +101,8 @@ instance MetadataPut AppM where
 
     pure url
 
-  updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time =
-    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time
+  updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time maybeThumbnailUri =
+    mapError SparqlError $ HSPARQL.updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf maybeFileName size time maybeThumbnailUri
 
 instance MediaTypeDiscover AppM FilePath where
   getMediaType = liftIO . discoverMediaTypeFP

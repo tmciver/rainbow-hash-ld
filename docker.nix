@@ -10,6 +10,8 @@ pkgs.dockerTools.buildLayeredImage {
   extraCommands = ''
     mkdir -p tmp
     chmod 1777 tmp
+    mkdir -p template
+    cp ${./template/put-file.template} template/put-file.template
   '';
   config = {
     Cmd = [ "/bin/caldron-server" ];

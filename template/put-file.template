@@ -3,6 +3,7 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX fo: <http://timmciver.com/file-ontology#>
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
 
 DELETE
 { <{{fileUri}}> fo:fileData ?oldFileDataUri ;
@@ -18,6 +19,9 @@ INSERT
                     dct:creator <{{creatorUri}}> ;
                     fo:previousRevision ?oldFileDataUri ;
                     prov:wasGeneratedBy _:a .
+  {{#hasThumbnail}}
+  <{{fileDataUri}}> fo:thumbnail <{{thumbnailUri}}> .
+  {{/hasThumbnail}}
 
   <{{fileUri}}> fo:fileData <{{fileDataUri}}> ;
                 fo:size "{{size}}"^^xsd:integer ;
@@ -25,7 +29,7 @@ INSERT
 
   {{! Upload activity }}
   _:a a prov:Activity ;
-      rdfs:label {{activityTitle}} ;
+      rdfs:label "{{activityTitle}}" ;
       prov:startedAtTime "{{creationTime}}"^^xsd:dateTime ;
       prov:endedAtTime "{{creationTime}}"^^xsd:dateTime ;
       prov:wasAssociatedWith <{{creatorUri}}> .
@@ -33,8 +37,8 @@ INSERT
   {{! Delegation }}
   {{#hasDelegate}}
   _:b a prov:Delegation ;
-      rdfs:label {{delegationTitle}} ;
-      prov:agent {{onBehalfOf}} ;
+      rdfs:label "{{delegationTitle}}" ;
+      prov:agent <{{onBehalfOf}}> ;
       prov:hadActivity _:a .
   {{/hasDelegate}}
 }

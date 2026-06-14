@@ -190,7 +190,7 @@ recentFilesQuery = do
   triple_ fileIri (dct .:. "format") mediaType
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
-  optional_ (triple_ fileIri (fo .:. "thumbnail") thumbnail)
+  optional_ (triple_ fileDataIri (fo .:. "thumbnail") thumbnail)
 
   orderNextDesc created
 
@@ -229,7 +229,7 @@ fileQuery fileUri' = do
   triple_ fileIri (dct .:. "created") created
   triple_ fileIri (dct .:. "modified") updated
   optional_ (triple_ fileIri (dct .:. "subject") subject)
-  optional_ (triple_ fileIri (fo .:. "thumbnail") thumbnail)
+  optional_ (triple_ fileDataIri (fo .:. "thumbnail") thumbnail)
 
   selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject, thumbnail]
 
@@ -471,14 +471,15 @@ updateFileGraphWithContent
     -> Maybe Text -- ^file name
     -> Integer    -- ^file size
     -> UTCTime -- ^file creation time
+    -> Maybe URI -- ^URI of thumbnail in blob storage
     -> m ()
-updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf mFileName size time = do
+updateFileGraphWithContent host fileUri blobUrl agentUri onBehalfOf mFileName size time maybeThumbnailUri = do
   let baseUrlText = "https://" <> host
       fileTitle = fromMaybe "" mFileName
   fileDataId <- liftIO nextRandom
   fileDataUri <- mkURI' $ baseUrlText <> "/file-data/" <> toText fileDataId
 
-  let pfd = PutFileData fileUri fileDataUri blobUrl fileTitle agentUri onBehalfOf size time
+  let pfd = PutFileData fileUri fileDataUri blobUrl fileTitle agentUri onBehalfOf size time maybeThumbnailUri
   renderPutFileTemplate pfd >>= logSparql >>= sparqlUpdate
   where logSparql :: MonadLogger m => Text -> m Text
         logSparql t = logDebugN t >> pure t
@@ -492,6 +493,7 @@ data PutFileData = PutFileData
   , onBehalfOf :: Maybe URI
   , fileSize :: Integer
   , creationTime :: UTCTime
+  , thumbnailUri :: Maybe URI
   }
 
 instance ToMustache PutFileData where
@@ -518,6 +520,8 @@ instance ToMustache PutFileData where
     , "activityTitle" ~> activityTitle
     , "size" ~> fileSize
     , "creationTime" ~= creationTime
+    , "thumbnailUri" ~> (render <$> thumbnailUri)
+    , "hasThumbnail" ~> isJust thumbnailUri
     ]
 
 data SparqlError
