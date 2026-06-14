@@ -9,9 +9,11 @@ module Caldron.Server (app) where
 import           Protolude              hiding (Handler)
 
 import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
+import           Data.Aeson             (ToJSON (..), object, (.=))
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Data.Text.Encoding     as T
 import qualified Network.HTTP.Client as HC
 import           Network.HTTP.Client    (defaultManagerSettings, httpLbs, newManager,
                                          parseRequest, responseBody)
@@ -19,19 +21,23 @@ import           Network.HTTP.Media     (MediaType)
 import           Network.HTTP.ReverseProxy (ProxyDest (..), WaiProxyResponse (..),
                                             defaultOnExc, waiProxyTo)
 import           Network.HTTP.Types     (status200, status400, status404, status500)
+import           System.Directory       (copyFile, removeFile)
+import           System.IO              (openTempFile, hClose)
+import           System.IO.Temp         ()
 import           Network.Wai            (responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
 import           Servant                hiding (URI)
 import           Servant.Multipart
 import           Text.URI               (URI, mkURI, render)
 
 import RainbowHash.Logger            (writeLog)
-import Caldron.App        (AppError(FileError), appErrorToString, runApp)
+import Caldron.App        (AppError, appErrorToString, runApp)
 import qualified Caldron.HSPARQL as HSPARQL
 import qualified Caldron.File as RH
 import qualified Caldron.App as App
 import Caldron.Config     (Config (..))
 import Caldron.LinkedData (FileNodeCreateOption (..), getFile,
                                          getRecentFiles, putFile, fileErrorToText)
+import Caldron.Job        (JobQueue, JobStatus (..), getJobStatus, submitJob)
 import Caldron.Profile    (ProfileCache)
 import Caldron.Servant    (WebIDUserAuth, genAuthServerContext)
 import Caldron.User (User, userWebId)
@@ -41,10 +47,17 @@ import Caldron.View.HTML  (HTML)
 import Caldron.EmailAddress (EmailAddress(..))
 import Caldron.Concept (Concept)
 
+data JobStatusResponse = JobStatusResponse Text (Maybe Text)
+
+instance ToJSON JobStatusResponse where
+  toJSON (JobStatusResponse s mMsg) =
+    object $ ["status" .= s] <> maybe [] (\msg -> ["message" .= msg]) mMsg
+
 type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
-    :<|> "files" :> Header "Host" Text
+    :<|> "files" :> Header "Accept" Text
+                 :> Header "Host" Text
                  :> Header "From" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> PostNoContent
@@ -79,6 +92,7 @@ type FilesAPI =
         :> "thumbnail"
         :> Raw
       )
+    :<|> "jobs"  :> Capture "jobId" Text :> Get '[JSON] JobStatusResponse
     :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
   )
   :<|> "static" :> Raw
@@ -188,15 +202,17 @@ putFileHandler =
 
 filesHandler
   :: Config
+  -> JobQueue
   -> User
-  -> Maybe Text
-  -> Maybe Text
+  -> Maybe Text  -- ^Accept header
+  -> Maybe Text  -- ^Host header
+  -> Maybe Text  -- ^From header
   -> MultipartData Tmp
   -> Handler NoContent
-filesHandler config user mHost mFrom multipartData = do
+filesHandler config jobQueue user mAccept mHost mFrom multipartData = do
   case (files multipartData, mHost) of
     ([fileData], Just host) -> uploadFile host mFrom fileData (inputs multipartData)
-    (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." }) 
+    (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." })
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
 
   where uploadFile
@@ -206,7 +222,7 @@ filesHandler config user mHost mFrom multipartData = do
           -> [Input]
           -> Handler NoContent
         uploadFile host' mFrom' fileData fields = do
-          let filePath = fdPayload fileData
+          let srcPath = fdPayload fileData
               maybeFileName = let fn = fdFileName fileData
                 in if fn == "\"\""
                    then Nothing
@@ -232,11 +248,30 @@ filesHandler config user mHost mFrom multipartData = do
 
           let allSubjects = subjects <> newConceptUris
 
-          either' <- liftIO $ runApp (putFile filePath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption) config
-          case either' of
-            Left err  -> (liftIO $ writeLog LevelError $ appErrorToString err) >> (throwError $ err500 { errBody = errToLBS err })
-            Right (Left err) -> (liftIO $ writeLog LevelError $ fileErrorToText err) >> (throwError $ err400 { errBody = errToLBS $ FileError err })
-            Right _ -> throwError err303 { errHeaders = [("Location", "/")] }
+          -- Copy the multipart temp file to a path that outlives this handler
+          stagingPath <- liftIO $ do
+            (path, h) <- openTempFile "/tmp" "caldron-upload-"
+            hClose h
+            copyFile srcPath path
+            pure path
+
+          -- Build the job action
+          let jobAction = do
+                result <- runApp
+                  (putFile stagingPath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption)
+                  config
+                removeFile stagingPath
+                pure $ case result of
+                  Left appErr          -> Left (appErrorToString appErr)
+                  Right (Left fileErr) -> Left (fileErrorToText fileErr)
+                  Right (Right uri)    -> Right uri
+
+          jobId <- liftIO $ submitJob jobQueue jobAction
+          let jobUrl = "/jobs/" <> jobId
+              isBrowser = maybe False (T.isInfixOf "text/html") mAccept
+          if isBrowser
+            then throwError err303 { errHeaders = [("Location", "/")] }
+            else throwError $ ServerError 202 "Accepted" "" [("Location", T.encodeUtf8 jobUrl)]
 
         getTitle :: [Input] -> Maybe Text
         getTitle = (<&> iValue) . find isTitle
@@ -317,15 +352,26 @@ thumbnailHandler config _ mHost fileId = Tagged $ \_ respond' -> do
                 [("Content-Type", "image/jpeg")]
                 (responseBody resp)
 
+jobsHandler :: JobQueue -> User -> Text -> Handler JobStatusResponse
+jobsHandler jobQueue _ jobId = do
+  mStatus <- liftIO $ getJobStatus jobQueue jobId
+  case mStatus of
+    Nothing           -> throwError err404
+    Just Pending      -> pure $ JobStatusResponse "pending" Nothing
+    Just Processing   -> pure $ JobStatusResponse "processing" Nothing
+    Just (Failed msg) -> pure $ JobStatusResponse "failed" (Just msg)
+    Just (Complete uri) ->
+      throwError err303 { errHeaders = [("Location", T.encodeUtf8 $ render uri)] }
+
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
-server :: Config -> Server FilesAPI
-server config = (\authedUser -> homeHandler config authedUser
-                  :<|> filesHandler config authedUser
+server :: Config -> JobQueue -> Server FilesAPI
+server config jobQueue = (\authedUser -> homeHandler config authedUser
+                  :<|> filesHandler config jobQueue authedUser
                   :<|> (fileContentHandler config authedUser
                         :<|>
                         getFileHandler config authedUser
@@ -338,8 +384,9 @@ server config = (\authedUser -> homeHandler config authedUser
                         putFileHandler config authedUser
                         :<|>
                         thumbnailHandler config authedUser)
+                  :<|> jobsHandler jobQueue authedUser
                   :<|> conceptsHandler config)
                 :<|> staticHandler
 
-app :: Config -> ProfileCache -> Application
-app config cache = serveWithContext api (genAuthServerContext cache) (server config)
+app :: Config -> ProfileCache -> JobQueue -> Application
+app config cache jobQueue = serveWithContext api (genAuthServerContext cache) (server config jobQueue)

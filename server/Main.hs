@@ -12,6 +12,7 @@ import           Options.Applicative      (execParser)
 import           Text.URI                 (render)
 
 import           Caldron.Config       (Config (Config), getConfig)
+import           Caldron.Job         (newJobQueue, startWorker)
 import           Caldron.Options      (Options (..), optionsParserInfo)
 import           Caldron.Profile      (newProfileCache)
 import           Caldron.Server       (app)
@@ -37,4 +38,6 @@ main = do
       putStrLn $ configToText config
       putStrLn $ "Caldron running on port " <> (show port' :: Text)
       cache <- newProfileCache
-      run port' (app config cache)
+      jobQueue <- newJobQueue
+      startWorker jobQueue
+      run port' (app config cache jobQueue)

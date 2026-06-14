@@ -55,6 +55,7 @@ executables:
       - Caldron.Servant
       - Caldron.Server
       - Caldron.User
+      - Caldron.Job
       - Caldron.Thumbnail
       - Caldron.View.File
       - Caldron.View.HTML
@@ -93,6 +94,7 @@ executables:
       - servant-client
       - servant-multipart
       - servant-multipart-client
+      - stm
       - servant-server
       - tagged
       - temporary
