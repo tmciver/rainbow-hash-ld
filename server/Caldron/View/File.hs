@@ -41,7 +41,7 @@ instance ToHtml [File] where
         let fileLink = render (RH.fileUri f)
             label    = fromMaybe (fromMaybe "" (RH.fileName f)) (RH.fileTitle f)
         div_ [classes_ ["col-6", "col-md-4", "col-lg-3", "mb-4"]] $
-          div_ [classes_ ["card", "h-100"]] $ do
+          a_ [href_ fileLink, classes_ ["card", "h-100", "text-decoration-none", "text-dark"]] $ do
             let thumbSrc = case RH.fileThumbnail f of
                   Just _  -> fileLink <> "/thumbnail"
                   Nothing -> "/static/no-preview.jpg"
@@ -51,10 +51,7 @@ instance ToHtml [File] where
                  , alt_ "File thumbnail"
                  ]
             div_ [classes_ ["card-body", "p-2"]] $
-              h6_ [classes_ ["card-title", "mb-0"]] $
-                a_ [ href_ fileLink
-                   , classes_ ["stretched-link", "text-dark"]
-                   ] (toHtml label)
+              h6_ [classes_ ["card-title", "mb-0"]] (toHtml label)
             div_ [classes_ ["card-footer", "text-muted", "small", "p-2"]] $ do
               div_ (toHtml $ showMediaType (RH.fileMediaType f))
               div_ (toHtml $ showUTCTime (RH.fileCreatedAt f))
