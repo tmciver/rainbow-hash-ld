@@ -56,7 +56,8 @@ instance ToJSON JobStatusResponse where
 type FilesAPI =
   WebIDUserAuth :>
   (Get '[HTML] Home
-    :<|> "files" :> Header "Host" Text
+    :<|> "files" :> Header "Accept" Text
+                 :> Header "Host" Text
                  :> Header "From" Text
                  :> MultipartForm Tmp (MultipartData Tmp)
                  :> PostNoContent
@@ -203,11 +204,12 @@ filesHandler
   :: Config
   -> JobQueue
   -> User
-  -> Maybe Text
-  -> Maybe Text
+  -> Maybe Text  -- ^Accept header
+  -> Maybe Text  -- ^Host header
+  -> Maybe Text  -- ^From header
   -> MultipartData Tmp
   -> Handler NoContent
-filesHandler config jobQueue user mHost mFrom multipartData = do
+filesHandler config jobQueue user mAccept mHost mFrom multipartData = do
   case (files multipartData, mHost) of
     ([fileData], Just host) -> uploadFile host mFrom fileData (inputs multipartData)
     (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." })
@@ -266,7 +268,10 @@ filesHandler config jobQueue user mHost mFrom multipartData = do
 
           jobId <- liftIO $ submitJob jobQueue jobAction
           let jobUrl = "/jobs/" <> jobId
-          throwError $ ServerError 202 "Accepted" "" [("Location", T.encodeUtf8 jobUrl)]
+              isBrowser = maybe False (T.isInfixOf "text/html") mAccept
+          if isBrowser
+            then throwError err303 { errHeaders = [("Location", "/")] }
+            else throwError $ ServerError 202 "Accepted" "" [("Location", T.encodeUtf8 jobUrl)]
 
         getTitle :: [Input] -> Maybe Text
         getTitle = (<&> iValue) . find isTitle
