@@ -112,10 +112,10 @@ homeHandler config user = do
   either' <- liftIO $ runApp getRecentFiles config
   case either' of
     Left err          -> throwError $ err500 { errBody = errToLBS err }
-    Right recentFiles -> pure $ Home user ((\f -> File f [] []) <$> recentFiles)
+    Right recentFiles -> pure $ Home user ((\f -> File user f [] []) <$> recentFiles)
 
 getFileHandler :: Config -> User -> Maybe Text -> Text -> Maybe Text -> Handler File
-getFileHandler config _ mHost fileId mVersion =
+getFileHandler config user mHost fileId mVersion =
   let defaultHost = "example.com"
       host = fromMaybe defaultHost $ (preferredHost config) <|> mHost
       uriText = "https://" <> host <> "/file/" <> fileId
@@ -137,7 +137,7 @@ getFileHandler config _ mHost fileId mVersion =
         Right (Just rhFile) -> do
           concepts   <- liftIO $ HSPARQL.getConceptsByUris    (sparqlEndpoint config) (RH.fileSubjects rhFile)
           revisions  <- liftIO $ HSPARQL.getRevisionHistory   (sparqlEndpoint config) (RH.fileUri rhFile)
-          pure $ File rhFile concepts revisions
+          pure $ File user rhFile concepts revisions
 
 webIdFromEmail :: EmailAddress -> Config -> Maybe URI
 webIdFromEmail email = Map.lookup email . webIdMap
