@@ -16,3 +16,4 @@ flycheck_*
 *.pem
 *.log
 /cert/*.conf
+/static/*.html
