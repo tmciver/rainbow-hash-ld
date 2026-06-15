@@ -69,8 +69,9 @@ instance ToHtml File where
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "/static/style.css"]
     body_ [style_ "overflow: hidden"] $ do
-      nav_ [classes_ ["navbar", "navbar-dark", "bg-dark", "px-3"]] $
+      nav_ [classes_ ["navbar", "navbar-dark", "bg-dark", "px-3"]] $ do
         a_ [class_ "navbar-brand", href_ "/"] "Caldron"
+        a_ [class_ "nav-link text-light", href_ "/static/file-ontology.html"] "Ontology"
       div_ [class_ "container-fluid", style_ "height: calc(100vh - 56px)"] $
         div_ [classes_ ["row", "no-gutters", "h-100"]] $ do
           div_ [classes_ ["col-md-8", "h-100"]] $

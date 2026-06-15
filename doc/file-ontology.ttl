@@ -1,0 +1,81 @@
+@prefix fo:   <http://timmciver.com/file-ontology#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix dh:   <https://www.w3.org/ns/ldt/document-hierarchy#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@base <http://timmciver.com/file-ontology> .
+
+<http://timmciver.com/file-ontology>
+    rdf:type owl:Ontology ;
+    owl:imports dct: ;
+    rdfs:label "File Ontology"@en ;
+    rdfs:comment "An ontology for describing file data and metadata as used in the Caldron application."@en .
+
+
+#################################################################
+#    Object Properties
+#################################################################
+
+fo:fileData
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:File ;
+    rdfs:range fo:FileData ;
+    rdfs:label "fileData"@en ;
+    rdfs:comment "Links a File to its current FileData object. Updated on each revision; the previous value is preserved via fo:previousRevision on the new FileData."@en .
+
+fo:previousRevision
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:FileData ;
+    rdfs:range fo:FileData ;
+    rdfs:label "previousRevision"@en ;
+    rdfs:comment "Links a FileData to the FileData it replaced, forming a revision history chain ordered newest-first."@en .
+
+fo:contentUrl
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:FileData ;
+    rdfs:label "contentUrl"@en ;
+    rdfs:comment "The URL from which the raw bytes of the file content can be retrieved (a content-addressed blob store URL)."@en .
+
+fo:thumbnail
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:FileData ;
+    rdfs:label "thumbnail"@en ;
+    rdfs:comment "The URL of a JPEG thumbnail image generated from the file content at the time of upload or update."@en .
+
+
+#################################################################
+#    Data Properties
+#################################################################
+
+fo:fileName
+    rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "fileName"@en ;
+    rdfs:comment "The name of the file as provided at upload time. Stored on both fo:File and fo:FileData."@en .
+
+fo:size
+    rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "size"@en ;
+    rdfs:comment "The size of the file content in bytes. Stored on both fo:File (current size) and fo:FileData (size at time of that revision)."@en .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+fo:File
+    rdf:type owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:subClassOf dh:Item ;
+    rdfs:label "File"@en ;
+    rdfs:comment "A mutable file object identified by a stable URI. Its current content is described by a linked fo:FileData object; previous revisions are accessible via the fo:previousRevision chain on fo:FileData."@en .
+
+fo:FileData
+    rdf:type owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "FileData"@en ;
+    rdfs:comment "An immutable snapshot of a file's content at a specific point in time. Created on initial upload and again on each update. Carries the content URL, size, format, thumbnail, and provenance for that revision."@en .

@@ -40,5 +40,6 @@ pkgs.haskellPackages.developPackage {
        stylish-haskell
        hpack
        pkgs.aider-chat
+       pkgs.pylode
       ]);
 }
