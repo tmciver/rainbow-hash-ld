@@ -1,9 +1,7 @@
-.PHONY: build build-static docker ontology-docs
+.PHONY: build build-static docker
 
 build:
 	nix-build
-
-ontology-docs: static/file-ontology.html
 
 static/file-ontology.html: doc/file-ontology.ttl
 	nix-shell --run "pylode -i $< -o $@"
