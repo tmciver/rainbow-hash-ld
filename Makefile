@@ -3,9 +3,11 @@
 build:
 	nix-build
 
-ontology-docs:
-	pylode -i doc/file-ontology.ttl -o static/file-ontology.html
+ontology-docs: static/file-ontology.html
 
-docker:
+static/file-ontology.html: doc/file-ontology.ttl
+	nix-shell --run "pylode -i $< -o $@"
+
+docker: static/file-ontology.html
 	nix-build docker.nix
 	docker load < result
