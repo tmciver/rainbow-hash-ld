@@ -1,53 +1,81 @@
-@prefix : <http://timmciver.com/file-ontology> .
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix xml: <http://www.w3.org/XML/1998/namespace> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix fo:   <http://timmciver.com/file-ontology#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix dh:   <https://www.w3.org/ns/ldt/document-hierarchy#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @base <http://timmciver.com/file-ontology> .
 
-<http://timmciver.com/file-ontology> rdf:type owl:Ontology ;
-                                      owl:imports dct: ;
-                                      rdfs:label "An ontology for describing file data and metadata."@en .
+<http://timmciver.com/file-ontology>
+    rdf:type owl:Ontology ;
+    owl:imports dct: ;
+    rdfs:label "File Ontology"@en ;
+    rdfs:comment "An ontology for describing file data and metadata as used in the Caldron application."@en .
+
 
 #################################################################
 #    Object Properties
 #################################################################
 
-###  http://timmciver.com/file-ontology#OWLObjectProperty_1bb7d692_0e07_453c_a354_b2e77623b4e2
-:OWLObjectProperty_1bb7d692_0e07_453c_a354_b2e77623b4e2 rdf:type owl:ObjectProperty ;
-                                                        rdfs:domain <http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_72eb1132_bd6c_4ad0_85fd_ad6186eca7dd> ;
-                                                        rdfs:range <http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_ec62714a_8869_4da2_9b8a_2c0939ecca9b> ;
-                                                        rdfs:label "fileData"@en .
+fo:fileData
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:File ;
+    rdfs:range fo:FileData ;
+    rdfs:label "fileData"@en ;
+    rdfs:comment "Links a File to its current FileData object. Updated on each revision; the previous value is preserved via fo:previousRevision on the new FileData."@en .
+
+fo:previousRevision
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:FileData ;
+    rdfs:range fo:FileData ;
+    rdfs:label "previousRevision"@en ;
+    rdfs:comment "Links a FileData to the FileData it replaced, forming a revision history chain ordered newest-first."@en .
+
+fo:contentUrl
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:FileData ;
+    rdfs:label "contentUrl"@en ;
+    rdfs:comment "The URL from which the raw bytes of the file content can be retrieved (a content-addressed blob store URL)."@en .
+
+fo:thumbnail
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain fo:FileData ;
+    rdfs:label "thumbnail"@en ;
+    rdfs:comment "The URL of a JPEG thumbnail image generated from the file content at the time of upload or update."@en .
 
 
 #################################################################
-#    Data properties
+#    Data Properties
 #################################################################
 
-###  http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLDataProperty_02cd57c1_d5f2_4fb5_a02a_d5467e7ab586
-<http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLDataProperty_02cd57c1_d5f2_4fb5_a02a_d5467e7ab586> rdf:type owl:DatatypeProperty ;
-                                                                                                                                rdfs:domain <http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_ec62714a_8869_4da2_9b8a_2c0939ecca9b> ;
-                                                                                                                                rdfs:range xsd:anyURI ;
-                                                                                                                                rdfs:comment "Gives the URL where the bytes of the file content can be retrieved." ;
-                                                                                                                                rdfs:label "contentUrl"@en .
+fo:fileName
+    rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "fileName"@en ;
+    rdfs:comment "The name of the file as provided at upload time. Stored on both fo:File and fo:FileData."@en .
+
+fo:size
+    rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "size"@en ;
+    rdfs:comment "The size of the file content in bytes. Stored on both fo:File (current size) and fo:FileData (size at time of that revision)."@en .
 
 
 #################################################################
 #    Classes
 #################################################################
 
-###  http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_72eb1132_bd6c_4ad0_85fd_ad6186eca7dd
-<http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_72eb1132_bd6c_4ad0_85fd_ad6186eca7dd> rdf:type owl:Class ;
-                                                                                                                         rdfs:comment "A file object representing a mutable array of bytes."@en ;
-                                                                                                                         rdfs:label "File"@en .
+fo:File
+    rdf:type owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:subClassOf dh:Item ;
+    rdfs:label "File"@en ;
+    rdfs:comment "A mutable file object identified by a stable URI. Its current content is described by a linked fo:FileData object; previous revisions are accessible via the fo:previousRevision chain on fo:FileData."@en .
 
-
-###  http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_ec62714a_8869_4da2_9b8a_2c0939ecca9b
-<http://timwww.semanticweb.org/tim/ontologies/2025/8/untitled-ontology-21/OWLClass_ec62714a_8869_4da2_9b8a_2c0939ecca9b> rdf:type owl:Class ;
-                                                                                                                         rdfs:comment "The FileData object gives information about the state of a file at some point in time. It is considered to be immutable."@en ;
-                                                                                                                         rdfs:label "FileData"@en .
-
-
-###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi
+fo:FileData
+    rdf:type owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "FileData"@en ;
+    rdfs:comment "An immutable snapshot of a file's content at a specific point in time. Created on initial upload and again on each update. Carries the content URL, size, format, thumbnail, and provenance for that revision."@en .
