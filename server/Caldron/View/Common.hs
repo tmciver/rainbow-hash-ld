@@ -16,5 +16,5 @@ navbar mUserName =
 
 pageFooter :: Monad m => HtmlT m ()
 pageFooter =
-  footer_ [classes_ ["bg-dark", "text-light", "px-3", "py-2", "mt-4"]] $
+  footer_ [classes_ ["bg-dark", "text-light", "px-3", "py-2"]] $
     a_ [class_ "text-light", href_ "/static/file-ontology.html"] "File Ontology"

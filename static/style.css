@@ -1,3 +1,13 @@
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+footer {
+    margin-top: auto;
+}
+
 .body-wrapper {
     width: 50%;
     margin: auto;
