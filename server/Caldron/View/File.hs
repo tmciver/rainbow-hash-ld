@@ -14,11 +14,13 @@ import           Lucid
 import           Network.HTTP.Media   (MediaType, mainType, subType)
 import           Text.URI             (render)
 
-import           Caldron.Concept  (Concept)
-import qualified Caldron.Concept  as Concept
-import qualified Caldron.File     as RH
+import           Caldron.Concept      (Concept)
+import qualified Caldron.Concept      as Concept
+import qualified Caldron.File         as RH
+import           Caldron.User         (User, userName)
+import           Caldron.View.Common  (navbar, pageFooter)
 
-data File = File RH.File [Concept] [RH.FileRevision]
+data File = File User RH.File [Concept] [RH.FileRevision]
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -37,7 +39,7 @@ instance ToHtml [File] where
   toHtml files = do
     h2_ [classes_ ["mt-4", "mb-3"]] "Recent Files"
     div_ [class_ "row"] $
-      forM_ files $ \(File f _ _) -> do
+      forM_ files $ \(File _ f _ _) -> do
         let fileLink = render (RH.fileUri f)
             label    = fromMaybe (fromMaybe "" (RH.fileName f)) (RH.fileTitle f)
         div_ [classes_ ["col-6", "col-md-4", "col-lg-3", "mb-4"]] $
@@ -62,16 +64,14 @@ instance ToHtml [File] where
 -- Single-file view page
 
 instance ToHtml File where
-  toHtml (File f concepts revisions) = html_ $ do
+  toHtml (File user f concepts revisions) = html_ $ do
     head_ $ do
       meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1, shrink-to-fit=no"]
       title_ (toHtml (fromMaybe "File" (RH.fileTitle f) <> " — Caldron"))
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "/static/style.css"]
     body_ [style_ "overflow: hidden"] $ do
-      nav_ [classes_ ["navbar", "navbar-dark", "bg-dark", "px-3"]] $ do
-        a_ [class_ "navbar-brand", href_ "/"] "Caldron"
-        a_ [class_ "nav-link text-light", href_ "/static/file-ontology.html"] "Ontology"
+      navbar (userName user)
       div_ [class_ "container-fluid", style_ "height: calc(100vh - 56px)"] $
         div_ [classes_ ["row", "no-gutters", "h-100"]] $ do
           div_ [classes_ ["col-md-8", "h-100"]] $
@@ -134,6 +134,8 @@ instance ToHtml File where
                             when isCurrent $
                               span_ [classes_ ["badge", "badge-primary", "ml-2"]] "current"
                           td_ (toHtml $ (show :: Integer -> Text) (RH.revisionSize r))
+
+      pageFooter
 
     where metaRow :: Monad m => Text -> Text -> HtmlT m ()
           metaRow lbl val = tr_ $ do

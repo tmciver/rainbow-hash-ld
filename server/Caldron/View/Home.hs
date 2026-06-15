@@ -7,6 +7,7 @@ import           Protolude             hiding (for_)
 
 import           Lucid
 
+import Caldron.View.Common (navbar, pageFooter)
 import Caldron.View.File (File (..))
 import Caldron.User (User, userName)
 
@@ -20,12 +21,8 @@ instance ToHtml Home where
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "static/style.css"]
     body_ $ do
-      nav_ [classes_ ["navbar", "navbar-dark", "bg-dark", "px-3"]] $ do
-        a_ [class_ "navbar-brand", href_ "/"] "Caldron"
-        a_ [class_ "nav-link text-light", href_ "/static/file-ontology.html"] "Ontology"
+      navbar (userName user)
       div_ [classes_ ["container", "mt-4"]] $ do
-        let name' = fromMaybe "there" (userName user)
-        p_ (toHtml $ "Hello, " <> name' <> "!")
         form_
           [ method_ "POST"
           , action_ "/files"
@@ -95,5 +92,7 @@ instance ToHtml Home where
         toHtml files
 
         script_ [src_ "/static/subject-pills.js"] ("" :: Text)
+
+      pageFooter
 
   toHtmlRaw = toHtml
