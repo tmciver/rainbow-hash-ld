@@ -376,7 +376,7 @@ searchFiles :: URI -> Text -> IO [File]
 searchFiles sparqlEndpoint' q = do
   let queryText = searchFilesQuery q
       reqText   = "POST " <> T.unpack (render sparqlEndpoint') <> "/query"
-  writeLog LevelInfo $ "searchFiles: SPARQL query:\n" <> queryText
+  writeLog LevelDebug $ "searchFiles: SPARQL query:\n" <> queryText
   case parseRequest reqText of
     Nothing  -> do
       writeLog LevelError $ "searchFiles: could not parse request URL: " <> T.pack reqText
@@ -391,14 +391,14 @@ searchFiles sparqlEndpoint' q = do
       mgr  <- newManager defaultManagerSettings
       resp <- httpLbs req' mgr
       let body = responseBody resp
-      writeLog LevelInfo $ "searchFiles: response status: " <> show (responseStatus resp)
-      writeLog LevelInfo $ "searchFiles: response body: "   <> T.decodeUtf8 (LBS.toStrict body)
+      writeLog LevelDebug $ "searchFiles: response status: " <> show (responseStatus resp)
+      writeLog LevelDebug $ "searchFiles: response body: "   <> T.decodeUtf8 (LBS.toStrict body)
       case decode body of
         Nothing -> do
           writeLog LevelError "searchFiles: failed to decode JSON response"
           pure []
         Just (SparqlResults bindings) -> do
-          writeLog LevelInfo $ "searchFiles: got " <> show (length bindings) <> " bindings"
+          writeLog LevelDebug $ "searchFiles: got " <> show (length bindings) <> " bindings"
           let (failures, files) = partitionEithers $ map toFile bindings
           forM_ failures $ \reason ->
             writeLog LevelError $ "searchFiles: failed to parse binding: " <> reason
