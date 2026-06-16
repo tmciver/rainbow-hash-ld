@@ -10,16 +10,20 @@ navbar :: Monad m => Maybe Text -> HtmlT m ()
 navbar mUserName =
   nav_ [classes_ ["navbar", "navbar-dark", "bg-dark", "px-3"]] $ do
     a_ [class_ "navbar-brand mr-3", href_ "/"] "Caldron"
-    form_ [class_ "form-inline", method_ "get", action_ "/search"] $ do
-      input_ [ type_ "search"
-             , name_ "q"
-             , class_ "form-control form-control-sm"
-             , placeholder_ "Search..."
-             ]
-      button_ [type_ "submit", classes_ ["btn", "btn-outline-light", "btn-sm", "ml-2"]] "Search"
-    case mUserName of
-      Just name -> span_ [classes_ ["ml-auto", "navbar-text", "text-light"]] (toHtml name)
-      Nothing   -> pure ()
+    div_ [classes_ ["ml-auto", "d-flex", "align-items-center"]] $ do
+      form_ [class_ "search-form mr-3", method_ "get", action_ "/search"] $
+        div_ [class_ "input-group"] $ do
+          input_ [ type_ "search"
+                 , name_ "q"
+                 , class_ "form-control search-input"
+                 , placeholder_ "Search files..."
+                 ]
+          div_ [class_ "input-group-append"] $
+            button_ [type_ "submit", class_ "btn btn-outline-light search-btn"] "⌕"
+      div_ [class_ "user-info"] $
+        case mUserName of
+          Just name -> span_ [class_ "navbar-text text-light"] (toHtml name)
+          Nothing   -> pure ()
 
 pageFooter :: Monad m => HtmlT m ()
 pageFooter =
