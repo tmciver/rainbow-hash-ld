@@ -10,6 +10,7 @@ module Caldron.HSPARQL
   , getFile
   , getFileAtVersion
   , getRevisionHistory
+  , searchFiles
   , searchConcepts
   , getConceptsByUris
   , mintAndCreateConcept
@@ -20,7 +21,7 @@ module Caldron.HSPARQL
 
 import           Protolude
 
-import Control.Monad.Logger (MonadLogger, logDebugN)
+import Control.Monad.Logger (MonadLogger, logDebugN, LogLevel(LevelInfo))
 import           Data.UUID                (toText)
 import           Data.UUID.V4             (nextRandom)
 import qualified Text.Parsec.Error as P
@@ -370,6 +371,86 @@ fileQuery fileUri' = do
   optional_ (triple_ fileDataIri (fo .:. "thumbnail") thumbnail)
 
   selectVars [name, size, title, desc, mediaType, created, updated, contentUrl, subject, thumbnail]
+
+searchFiles :: URI -> Text -> IO [File]
+searchFiles sparqlEndpoint' q = do
+  let queryText = searchFilesQuery q
+      reqText   = "POST " <> T.unpack (render sparqlEndpoint') <> "/query"
+  writeLog LevelDebug $ "searchFiles: SPARQL query:\n" <> queryText
+  case parseRequest reqText of
+    Nothing  -> do
+      writeLog LevelError $ "searchFiles: could not parse request URL: " <> T.pack reqText
+      pure []
+    Just req -> do
+      let req' = req
+            { requestHeaders = [ ("Content-Type", "application/sparql-query")
+                               , ("Accept",       "application/sparql-results+json")
+                               ]
+            , requestBody    = RequestBodyBS $ T.encodeUtf8 queryText
+            }
+      mgr  <- newManager defaultManagerSettings
+      resp <- httpLbs req' mgr
+      let body = responseBody resp
+      writeLog LevelDebug $ "searchFiles: response status: " <> show (responseStatus resp)
+      writeLog LevelDebug $ "searchFiles: response body: "   <> T.decodeUtf8 (LBS.toStrict body)
+      case decode body of
+        Nothing -> do
+          writeLog LevelError "searchFiles: failed to decode JSON response"
+          pure []
+        Just (SparqlResults bindings) -> do
+          writeLog LevelDebug $ "searchFiles: got " <> show (length bindings) <> " bindings"
+          let (failures, files) = partitionEithers $ map toFile bindings
+          forM_ failures $ \reason ->
+            writeLog LevelError $ "searchFiles: failed to parse binding: " <> reason
+          pure files
+  where
+    toFile binding = do
+      fileUriText    <- note "missing fileUri"    $ svValue <$> Map.lookup "fileUri"    binding
+      fileUri'       <- note "invalid fileUri"    $ mkURI fileUriText
+      contentUrlText <- note "missing contentUrl" $ svValue <$> Map.lookup "contentUrl" binding
+      contentUrl     <- note "invalid contentUrl" $ mkURI contentUrlText
+      sizeText       <- note "missing size"       $ svValue <$> Map.lookup "size"       binding
+      size           <- note "invalid size"       $ readMaybe sizeText
+      mediaTypeText  <- note "missing mediaType"  $ svValue <$> Map.lookup "mediaType"  binding
+      mediaType      <- note "invalid mediaType"  $ parseAccept (T.encodeUtf8 mediaTypeText)
+      createdText    <- note "missing created"    $ svValue <$> Map.lookup "created"    binding
+      created        <- note "invalid created"    $ iso8601ParseM (T.unpack createdText)
+      let maybeName      = svValue <$> Map.lookup "name"      binding
+          maybeTitle     = svValue <$> Map.lookup "title"     binding
+          maybeDesc      = svValue <$> Map.lookup "desc"      binding
+          maybeUpdated   = svValue <$> Map.lookup "updated"   binding
+                           >>= iso8601ParseM . T.unpack
+          updatedAt      = fromMaybe created maybeUpdated
+          maybeThumbnail = svValue <$> Map.lookup "thumbnail" binding >>= mkURI
+      pure $ File fileUri' maybeName size maybeTitle maybeDesc mediaType created updatedAt contentUrl [] maybeThumbnail
+
+searchFilesQuery :: Text -> Text
+searchFilesQuery q =
+  "PREFIX text: <http://jena.apache.org/text#>\n\
+  \PREFIX fo:   <http://timmciver.com/file-ontology#>\n\
+  \PREFIX dct:  <http://purl.org/dc/terms/>\n\
+  \SELECT DISTINCT ?fileUri ?name ?size ?title ?desc ?mediaType ?created ?updated ?contentUrl ?thumbnail\n\
+  \WHERE {\n\
+  \  {\n\
+  \    ?fileUri text:query \"" <> escapeSparqlLiteral q <> "\" .\n\
+  \    ?fileUri fo:fileData ?fileDataIri .\n\
+  \  } UNION {\n\
+  \    ?concept text:query \"" <> escapeSparqlLiteral q <> "\" .\n\
+  \    ?fileUri dct:subject ?concept .\n\
+  \    ?fileUri fo:fileData ?fileDataIri .\n\
+  \  }\n\
+  \  ?fileDataIri fo:contentUrl ?contentUrl .\n\
+  \  OPTIONAL { ?fileUri fo:fileName     ?name  . }\n\
+  \  OPTIONAL { ?fileUri dct:title       ?title . }\n\
+  \  OPTIONAL { ?fileUri dct:description ?desc  . }\n\
+  \  ?fileUri fo:size      ?size      .\n\
+  \  ?fileUri dct:format   ?mediaType .\n\
+  \  ?fileUri dct:created  ?created   .\n\
+  \  OPTIONAL { ?fileUri      dct:modified ?updated   . }\n\
+  \  OPTIONAL { ?fileDataIri  fo:thumbnail ?thumbnail . }\n\
+  \}\n\
+  \ORDER BY DESC(?created)\n\
+  \LIMIT 20"
 
 -- TODO: we probably don't want to fetch all Concepts. Update to fetch concepts based on a search term.
 allConceptsQuery :: Query SelectQuery

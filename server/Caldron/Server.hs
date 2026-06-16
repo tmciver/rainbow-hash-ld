@@ -8,7 +8,7 @@ module Caldron.Server (app) where
 
 import           Protolude              hiding (Handler)
 
-import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelError))
+import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelDebug, LevelError))
 import           Data.Aeson             (ToJSON (..), object, (.=))
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
@@ -41,8 +41,9 @@ import Caldron.Job        (JobQueue, JobStatus (..), getJobStatus, submitJob)
 import Caldron.Profile    (ProfileCache)
 import Caldron.Servant    (WebIDUserAuth, genAuthServerContext)
 import Caldron.User (User, userWebId)
-import Caldron.View.File  (File (..))
-import Caldron.View.Home  (Home (..))
+import Caldron.View.File   (File (..))
+import Caldron.View.Home   (Home (..))
+import Caldron.View.Search (SearchResults (..))
 import Caldron.View.HTML  (HTML)
 import Caldron.EmailAddress (EmailAddress(..))
 import Caldron.Concept (Concept)
@@ -95,8 +96,9 @@ type FilesAPI =
         :> QueryParam "version" Text
         :> Raw
       )
-    :<|> "jobs"  :> Capture "jobId" Text :> Get '[JSON] JobStatusResponse
+    :<|> "jobs"     :> Capture "jobId" Text :> Get '[JSON] JobStatusResponse
     :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
+    :<|> "search"   :> QueryParam "q" Text :> Get '[HTML] SearchResults
   )
   :<|> "static" :> Raw
 
@@ -335,7 +337,7 @@ fileContentHandler config _ mHost fileId mVersion = Tagged $ \req respond' -> do
         Right Nothing   -> respond' $ responseLBS status404 [] "File not found."
         Right (Just rhFile) -> do
           let contentUrl = T.unpack (render (RH.fileContent rhFile))
-          writeLog LevelInfo $ render (RH.fileContent rhFile)
+          writeLog LevelDebug $ render (RH.fileContent rhFile)
           mgr <- newManager defaultManagerSettings
           httpReq <- parseRequest contentUrl
           let dest   = ProxyDest (HC.host httpReq) (HC.port httpReq)
@@ -391,6 +393,14 @@ jobsHandler jobQueue _ jobId = do
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
+searchHandler :: Config -> User -> Maybe Text -> Handler SearchResults
+searchHandler config user mQ = do
+  liftIO $ writeLog LevelDebug $ "searchHandler: query=" <> show mQ
+  let q = fromMaybe "" mQ
+  files' <- liftIO $ maybe (pure []) (HSPARQL.searchFiles (sparqlEndpoint config)) mQ
+  liftIO $ writeLog LevelDebug $ "searchHandler: got " <> show (length files') <> " results"
+  pure $ SearchResults user q ((\f -> File user f [] []) <$> files')
+
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
@@ -410,7 +420,8 @@ server config jobQueue = (\authedUser -> homeHandler config authedUser
                         :<|>
                         thumbnailHandler config authedUser)
                   :<|> jobsHandler jobQueue authedUser
-                  :<|> conceptsHandler config)
+                  :<|> conceptsHandler config
+                  :<|> searchHandler config authedUser)
                 :<|> staticHandler
 
 app :: Config -> ProfileCache -> JobQueue -> Application
