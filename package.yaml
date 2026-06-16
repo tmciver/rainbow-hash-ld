@@ -27,7 +27,6 @@ library:
     - Caldron.LinkedData
     - Caldron.File
     - Caldron.EmailAddress
-    - Caldron.Logger
   dependencies:
     - aeson
     - http-media
