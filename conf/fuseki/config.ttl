@@ -3,6 +3,9 @@ PREFIX fuseki:  <http://jena.apache.org/fuseki#>
 PREFIX rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX ja:      <http://jena.hpl.hp.com/2005/11/Assembler#>
 PREFIX tdb2:    <http://jena.apache.org/2016/tdb#>
+PREFIX text:    <http://jena.apache.org/text#>
+PREFIX dct:     <http://purl.org/dc/terms/>
+PREFIX skos:    <http://www.w3.org/2004/02/skos/core#>
 
 [] a fuseki:Server .
 
@@ -11,7 +14,25 @@ PREFIX tdb2:    <http://jena.apache.org/2016/tdb#>
       fuseki:endpoint [ fuseki:operation fuseki:query;  fuseki:name "query"  ] ;
       fuseki:endpoint [ fuseki:operation fuseki:update; fuseki:name "update" ] ;
       fuseki:endpoint [ fuseki:operation fuseki:gsp-rw; fuseki:name "data"   ] ;
-      fuseki:dataset <#dataset> .
+      fuseki:dataset <#text_dataset> .
+
+<#text_dataset> a text:TextDataset ;
+    text:dataset <#dataset> ;
+    text:index   <#indexLucene> .
 
 <#dataset> a tdb2:DatasetTDB2 ;
     tdb2:location "/fuseki/databases/DB2" .
+
+<#indexLucene> a text:TextIndexLucene ;
+    text:directory <file:/fuseki/lucene> ;
+    text:entityMap <#entMap> .
+
+<#entMap> a text:EntityMap ;
+    text:entityField  "uri" ;
+    text:defaultField "text" ;
+    text:map (
+        [ text:field "text" ; text:predicate dct:title ]
+        [ text:field "text" ; text:predicate dct:description ]
+        [ text:field "text" ; text:predicate skos:prefLabel ]
+        [ text:field "text" ; text:predicate skos:altLabel ]
+    ) .
