@@ -89,6 +89,8 @@ instance ToHtml Home where
 
           button_ [type_ "submit", classes_ ["btn", "btn-primary"]] (toHtml ("Submit" :: Text))
 
+        when (not $ null files) $
+          h2_ [classes_ ["mt-4", "mb-3"]] "Recent Files"
         toHtml files
 
         script_ [src_ "/static/subject-pills.js"] ("" :: Text)

@@ -397,9 +397,9 @@ searchHandler :: Config -> User -> Maybe Text -> Handler SearchResults
 searchHandler config user mQ = do
   liftIO $ writeLog LevelInfo $ "searchHandler: query=" <> show mQ
   let q = fromMaybe "" mQ
-  files <- liftIO $ maybe (pure []) (HSPARQL.searchFiles (sparqlEndpoint config)) mQ
-  liftIO $ writeLog LevelInfo $ "searchHandler: got " <> show (length files) <> " results"
-  pure $ SearchResults user q ((\f -> File user f [] []) <$> files)
+  files' <- liftIO $ maybe (pure []) (HSPARQL.searchFiles (sparqlEndpoint config)) mQ
+  liftIO $ writeLog LevelInfo $ "searchHandler: got " <> show (length files') <> " results"
+  pure $ SearchResults user q ((\f -> File user f [] []) <$> files')
 
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"

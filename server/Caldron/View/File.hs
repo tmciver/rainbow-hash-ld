@@ -37,7 +37,6 @@ showUTCTime = T.pack . formatTime defaultTimeLocale "%B %e, %Y %l:%M:%S%p %Z"
 instance ToHtml [File] where
   toHtml [] = pure ()
   toHtml files = do
-    h2_ [classes_ ["mt-4", "mb-3"]] "Recent Files"
     div_ [class_ "row"] $
       forM_ files $ \(File _ f _ _) -> do
         let fileLink = render (RH.fileUri f)
