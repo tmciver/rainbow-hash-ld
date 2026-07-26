@@ -44,6 +44,7 @@ import Caldron.User (User, userWebId)
 import Caldron.View.File   (File (..))
 import Caldron.View.Home   (Home (..))
 import Caldron.View.Search (SearchResults (..))
+import Caldron.View.Upload (UploadWizard (..))
 import Caldron.View.HTML  (HTML)
 import Caldron.EmailAddress (EmailAddress(..))
 import Caldron.Concept (Concept)
@@ -99,6 +100,7 @@ type FilesAPI =
     :<|> "jobs"     :> Capture "jobId" Text :> Get '[JSON] JobStatusResponse
     :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
     :<|> "search"   :> QueryParam "q" Text :> Get '[HTML] SearchResults
+    :<|> "upload"   :> "wizard"            :> Get '[HTML] UploadWizard
   )
   :<|> "static" :> Raw
 
@@ -393,6 +395,9 @@ jobsHandler jobQueue _ jobId = do
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
+uploadWizardHandler :: User -> Handler UploadWizard
+uploadWizardHandler _ = pure UploadWizard
+
 searchHandler :: Config -> User -> Maybe Text -> Handler SearchResults
 searchHandler config user mQ = do
   liftIO $ writeLog LevelDebug $ "searchHandler: query=" <> show mQ
@@ -421,7 +426,8 @@ server config jobQueue = (\authedUser -> homeHandler config authedUser
                         thumbnailHandler config authedUser)
                   :<|> jobsHandler jobQueue authedUser
                   :<|> conceptsHandler config
-                  :<|> searchHandler config authedUser)
+                  :<|> searchHandler config authedUser
+                  :<|> uploadWizardHandler authedUser)
                 :<|> staticHandler
 
 app :: Config -> ProfileCache -> JobQueue -> Application

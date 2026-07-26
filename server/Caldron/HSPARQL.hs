@@ -21,7 +21,7 @@ module Caldron.HSPARQL
 
 import           Protolude
 
-import Control.Monad.Logger (MonadLogger, logDebugN, LogLevel(LevelInfo))
+import Control.Monad.Logger (MonadLogger, logDebugN, LogLevel(LevelDebug, LevelError))
 import           Data.UUID                (toText)
 import           Data.UUID.V4             (nextRandom)
 import qualified Text.Parsec.Error as P
@@ -30,7 +30,6 @@ import qualified Data.Text.Encoding                    as T
 import qualified Data.ByteString.Lazy                  as LBS
 import           Network.HTTP.Client                   (Request, RequestBody(RequestBodyBS), Response, requestHeaders, requestBody, defaultManagerSettings, newManager, httpLbs, responseStatus, responseBody, parseRequest)
 import           Network.HTTP.Types                    (Status, statusIsSuccessful)
-import           Control.Monad.Logger            (LogLevel (LevelDebug, LevelError))
 import           Data.Aeson                      (FromJSON (..), decode,
                                                   withObject, (.:))
 import qualified Data.Map.Strict                 as Map

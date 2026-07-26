@@ -61,6 +61,7 @@ executables:
       - Caldron.View.HTML
       - Caldron.View.Home
       - Caldron.View.Search
+      - Caldron.View.Upload
     dependencies:
       - aeson
       - bytestring

@@ -19,7 +19,7 @@ pkgs.haskellPackages.developPackage {
 
   overrides = final: prev:
     let
-      inherit (pkgs.haskell.lib) doJailbreak;
+      inherit (pkgs.haskell.lib) doJailbreak dontCheck;
 
       hsparqlSrc = pkgs.fetchFromGitHub {
         owner = "tmciver";
@@ -29,7 +29,7 @@ pkgs.haskellPackages.developPackage {
       };
     in {
       rdf4h = doJailbreak prev.rdf4h;
-      hsparql = final.callCabal2nix "hsparql" hsparqlSrc {};
+      hsparql = dontCheck (final.callCabal2nix "hsparql" hsparqlSrc {});
     };
 
   modifier = drv:

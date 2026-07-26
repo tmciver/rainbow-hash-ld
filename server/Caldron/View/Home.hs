@@ -20,81 +20,56 @@ instance ToHtml Home where
       title_ "Caldron"
       link_ [rel_ "stylesheet", href_ "https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"]
       link_ [rel_ "stylesheet", href_ "static/style.css"]
+      style_ modalCss
     body_ $ do
       navbar (userName user)
       div_ [classes_ ["container", "mt-4"]] $ do
-        form_
-          [ method_ "POST"
-          , action_ "/files"
-          , enctype_ "multipart/form-data"
-          ] $ do
-          div_ [class_ "form-group"] $ do
-            label_ [for_ "file-input"] "Upload a File"
-            input_ [ type_ "file"
-                   , name_ "file"
-                   , id_ "file-input"
-                   , class_ "form-control-file"
-                   ]
-
-          div_ [class_ "form-group"] $ do
-            label_ [for_ "title-input"] "Title"
-            input_ [ type_ "text"
-                   , name_ "title"
-                   , placeholder_ "Enter a title for the file"
-                   , id_ "title-input"
-                   , class_ "form-control"
-                   ]
-
-          div_ [class_ "form-group"] $ do
-            label_ [for_ "desc-input"] "Description"
-            textarea_
-              [ name_ "description"
-              , placeholder_ "Enter a description of the file"
-              , id_ "desc-input"
-              , class_ "form-control"
-              ]
-              (toHtml ("" :: Text))
-
-          div_ [class_ "form-group"] $ do
-            label_ "Subject (SKOS Concepts)"
-            div_ [id_ "subject-pills", classes_ ["mb-2"]] (pure ())
-            div_ [class_ "input-group"] $ do
-              div_ [class_ "position-relative", style_ "flex: 1"] $ do
-                input_ [ type_ "text"
-                       , id_ "subject-concept-input"
-                       , class_ "form-control"
-                       , placeholder_ "Search for a concept..."
-                       , autocomplete_ "off"
-                       ]
-                div_ [ id_ "concept-suggestions"
-                     , class_ "list-group"
-                     , style_ "position: absolute; z-index: 1000; width: 100%; display: none"
-                     ] (pure ())
-              div_ [class_ "input-group-append"] $
-                button_ [ type_ "button"
-                        , id_ "add-subject-btn"
-                        , class_ "btn btn-secondary"
-                        ] "Add"
-            div_ [id_ "subject-hidden-inputs"] (pure ())
-
-          div_ [class_ "form-check"] $ do
-            input_ [ type_ "checkbox"
-                   , name_ "create-new-node"
-                   , id_ "new-node-checkbox"
-                   , class_ "form-check-input"
-                   ]
-            label_ [ for_ "new-node-checkbox"
-                   , class_ "form-check-label"]
-              "Create a new node even if one already exists for this content"
-
-          button_ [type_ "submit", classes_ ["btn", "btn-primary"]] (toHtml ("Submit" :: Text))
+        div_ [classes_ ["d-flex", "align-items-center", "mb-4"]] $ do
+          h2_ [class_ "mb-0"] "Files"
+          button_ [ type_ "button"
+                  , classes_ ["btn", "btn-primary", "btn-sm", "ml-auto"]
+                  , onclick_ "openUploadWizard()"
+                  ] "Upload"
 
         when (not $ null files) $
-          h2_ [classes_ ["mt-4", "mb-3"]] "Recent Files"
+          h5_ [classes_ ["mt-2", "mb-3", "text-muted"]] "Recent Files"
         toHtml files
 
-        script_ [src_ "/static/subject-pills.js"] ("" :: Text)
+      -- Upload wizard modal
+      div_ [id_ "upload-modal-overlay", class_ "upload-modal-overlay"] $
+        div_ [class_ "upload-modal-box"] $ do
+          button_ [ type_ "button"
+                  , class_ "upload-modal-close"
+                  , onclick_ "closeUploadModal()"
+                  ] "\xd7"
+          iframe_ [id_ "upload-wizard-frame", class_ "upload-modal-frame", src_ ""] ""
 
       pageFooter
+      script_ modalJs
 
   toHtmlRaw = toHtml
+
+modalCss :: Text
+modalCss =
+  ".upload-modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%;\
+  \ background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center; }\
+  \.upload-modal-overlay.open { display:flex; }\
+  \.upload-modal-box { position:relative; background:#fff; border-radius:6px;\
+  \ width:880px; max-width:95vw; height:620px; max-height:90vh; display:flex; flex-direction:column; }\
+  \.upload-modal-close { position:absolute; top:8px; right:12px; background:none; border:none;\
+  \ font-size:1.5rem; line-height:1; cursor:pointer; z-index:1; }\
+  \.upload-modal-frame { flex:1; border:none; border-radius:6px; width:100%; height:100%; }"
+
+modalJs :: Text
+modalJs =
+  "function openUploadWizard() {\
+  \  document.getElementById('upload-wizard-frame').src = '/upload/wizard';\
+  \  document.getElementById('upload-modal-overlay').classList.add('open');\
+  \}\
+  \function closeUploadModal() {\
+  \  document.getElementById('upload-modal-overlay').classList.remove('open');\
+  \  document.getElementById('upload-wizard-frame').src = '';\
+  \}\
+  \window.addEventListener('message', function(e) {\
+  \  if (e.data === 'upload-wizard-done') { closeUploadModal(); location.reload(); }\
+  \});"
