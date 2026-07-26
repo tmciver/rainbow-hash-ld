@@ -29,10 +29,6 @@
 
   document.getElementById('upload-btn').addEventListener('click', doUpload);
   document.getElementById('skip-btn').addEventListener('click', doSkip);
-  document.getElementById('done-btn').addEventListener('click', function() {
-    window.parent.postMessage('upload-wizard-done', '*');
-  });
-
   // ── Queue management ─────────────────────────────────────────────────────────
 
   function initQueue(files) {

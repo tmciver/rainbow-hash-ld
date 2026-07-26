@@ -396,7 +396,7 @@ conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
 uploadWizardHandler :: User -> Handler UploadWizard
-uploadWizardHandler _ = pure UploadWizard
+uploadWizardHandler user = pure (UploadWizard user)
 
 searchHandler :: Config -> User -> Maybe Text -> Handler SearchResults
 searchHandler config user mQ = do
