@@ -34,3 +34,5 @@ instance ToHtml Home where
         toHtml files
 
       pageFooter
+
+  toHtmlRaw = toHtml

@@ -3,6 +3,7 @@
 
 module Caldron.Concept
   ( Concept (..)
+  , ConceptDetail (..)
   , lookupConcept
   ) where
 
@@ -21,6 +22,12 @@ instance ToJSON Concept where
     [ "uri"       .= render (conceptUri c)
     , "prefLabel" .= conceptPrefLabel c
     ]
+
+data ConceptDetail = ConceptDetail
+  { cdConcept  :: Concept
+  , cdBroader  :: [Concept]
+  , cdNarrower :: [Concept]
+  }
 
 lookupConcept :: [Concept] -> URI -> Maybe Concept
 lookupConcept concepts uri = find ((== render uri) . render . conceptUri) concepts

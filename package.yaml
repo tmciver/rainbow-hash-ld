@@ -57,6 +57,7 @@ executables:
       - Caldron.Job
       - Caldron.Thumbnail
       - Caldron.View.Common
+      - Caldron.View.ConceptDetail
       - Caldron.View.File
       - Caldron.View.HTML
       - Caldron.View.Home

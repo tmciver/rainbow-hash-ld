@@ -9,7 +9,7 @@ module Caldron.Server (app) where
 import           Protolude              hiding (Handler)
 
 import           Control.Monad.Logger          (LogLevel(LevelInfo, LevelDebug, LevelError))
-import           Data.Aeson             (ToJSON (..), object, (.=))
+import           Data.Aeson             (FromJSON (..), ToJSON (..), object, withObject, (.=), (.:))
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -44,10 +44,17 @@ import Caldron.User (User, userWebId)
 import Caldron.View.File   (File (..))
 import Caldron.View.Home   (Home (..))
 import Caldron.View.Search (SearchResults (..))
-import Caldron.View.Upload (UploadWizard (..))
-import Caldron.View.HTML  (HTML)
-import Caldron.EmailAddress (EmailAddress(..))
-import Caldron.Concept (Concept)
+import Caldron.View.Upload        (UploadWizard (..))
+import Caldron.View.ConceptDetail (ConceptDetailPage (..))
+import Caldron.View.HTML          (HTML)
+import Caldron.EmailAddress       (EmailAddress(..))
+import Caldron.Concept            (Concept)
+
+newtype ConceptRelationRequest = ConceptRelationRequest { relatedConceptUri :: Text }
+
+instance FromJSON ConceptRelationRequest where
+  parseJSON = withObject "ConceptRelationRequest" $ \o ->
+    ConceptRelationRequest <$> o .: "uri"
 
 data JobStatusResponse = JobStatusResponse Text (Maybe Text)
 
@@ -99,6 +106,11 @@ type FilesAPI =
       )
     :<|> "jobs"     :> Capture "jobId" Text :> Get '[JSON] JobStatusResponse
     :<|> "concepts" :> QueryParam "q" Text :> Get '[JSON] [Concept]
+    :<|> "concepts" :> Header "Host" Text :> Capture "conceptId" Text :> Get '[HTML] ConceptDetailPage
+    :<|> "concepts" :> Header "Host" Text :> Capture "conceptId" Text :> "broader"  :> ReqBody '[JSON] ConceptRelationRequest :> PostNoContent
+    :<|> "concepts" :> Header "Host" Text :> Capture "conceptId" Text :> "broader"  :> Capture "relatedId" Text               :> DeleteNoContent
+    :<|> "concepts" :> Header "Host" Text :> Capture "conceptId" Text :> "narrower" :> ReqBody '[JSON] ConceptRelationRequest :> PostNoContent
+    :<|> "concepts" :> Header "Host" Text :> Capture "conceptId" Text :> "narrower" :> Capture "relatedId" Text               :> DeleteNoContent
     :<|> "search"   :> QueryParam "q" Text :> Get '[HTML] SearchResults
     :<|> "upload"   :> "wizard"            :> Get '[HTML] UploadWizard
   )
@@ -395,6 +407,60 @@ jobsHandler jobQueue _ jobId = do
 conceptsHandler :: Config -> Maybe Text -> Handler [Concept]
 conceptsHandler config mQ = liftIO $ maybe (pure []) (HSPARQL.searchConcepts (sparqlEndpoint config)) mQ
 
+conceptDetailHandler :: Config -> User -> Maybe Text -> Text -> Handler ConceptDetailPage
+conceptDetailHandler config user mHost conceptId =
+  let host    = fromMaybe "example.com" $ preferredHost config <|> mHost
+      uriText = "https://" <> host <> "/concepts/" <> conceptId
+  in case mkURI uriText of
+    Nothing -> throwError $ err400 { errBody = "Invalid concept URI" }
+    Just conceptUri' -> do
+      mDetail <- liftIO $ HSPARQL.getConceptDetail (sparqlEndpoint config) conceptUri'
+      maybe (throwError err404) (pure . ConceptDetailPage user) mDetail
+
+addBroaderHandler :: Config -> User -> Maybe Text -> Text -> ConceptRelationRequest -> Handler NoContent
+addBroaderHandler config _ mHost conceptId req = do
+  let host = fromMaybe "example.com" $ preferredHost config <|> mHost
+      cUri = "https://" <> host <> "/concepts/" <> conceptId
+      bUri = relatedConceptUri req
+  case (mkURI cUri, mkURI bUri) of
+    (Just c, Just b) -> liftIO (HSPARQL.addBroaderConcept (sparqlEndpoint config) c b)
+      >>= either sparqlErr (const $ pure NoContent)
+    _ -> throwError $ err400 { errBody = "Invalid URI" }
+
+removeBroaderHandler :: Config -> User -> Maybe Text -> Text -> Text -> Handler NoContent
+removeBroaderHandler config _ mHost conceptId relatedId = do
+  let host = fromMaybe "example.com" $ preferredHost config <|> mHost
+      cUri = "https://" <> host <> "/concepts/" <> conceptId
+      bUri = "https://" <> host <> "/concepts/" <> relatedId
+  case (mkURI cUri, mkURI bUri) of
+    (Just c, Just b) -> liftIO (HSPARQL.removeBroaderConcept (sparqlEndpoint config) c b)
+      >>= either sparqlErr (const $ pure NoContent)
+    _ -> throwError $ err400 { errBody = "Invalid URI" }
+
+addNarrowerHandler :: Config -> User -> Maybe Text -> Text -> ConceptRelationRequest -> Handler NoContent
+addNarrowerHandler config _ mHost conceptId req = do
+  let host = fromMaybe "example.com" $ preferredHost config <|> mHost
+      cUri = "https://" <> host <> "/concepts/" <> conceptId
+      nUri = relatedConceptUri req
+  case (mkURI cUri, mkURI nUri) of
+    (Just c, Just n) -> liftIO (HSPARQL.addBroaderConcept (sparqlEndpoint config) n c)
+      >>= either sparqlErr (const $ pure NoContent)
+    _ -> throwError $ err400 { errBody = "Invalid URI" }
+
+removeNarrowerHandler :: Config -> User -> Maybe Text -> Text -> Text -> Handler NoContent
+removeNarrowerHandler config _ mHost conceptId relatedId = do
+  let host = fromMaybe "example.com" $ preferredHost config <|> mHost
+      cUri = "https://" <> host <> "/concepts/" <> conceptId
+      nUri = "https://" <> host <> "/concepts/" <> relatedId
+  case (mkURI cUri, mkURI nUri) of
+    (Just c, Just n) -> liftIO (HSPARQL.removeBroaderConcept (sparqlEndpoint config) n c)
+      >>= either sparqlErr (const $ pure NoContent)
+    _ -> throwError $ err400 { errBody = "Invalid URI" }
+
+sparqlErr :: HSPARQL.SparqlError -> Handler a
+sparqlErr e = throwError $ err500
+  { errBody = LBS.fromStrict . T.encodeUtf8 $ HSPARQL.sparqlErrorToText e }
+
 uploadWizardHandler :: User -> Handler UploadWizard
 uploadWizardHandler user = pure (UploadWizard user)
 
@@ -426,6 +492,11 @@ server config jobQueue = (\authedUser -> homeHandler config authedUser
                         thumbnailHandler config authedUser)
                   :<|> jobsHandler jobQueue authedUser
                   :<|> conceptsHandler config
+                  :<|> conceptDetailHandler config authedUser
+                  :<|> addBroaderHandler   config authedUser
+                  :<|> removeBroaderHandler config authedUser
+                  :<|> addNarrowerHandler  config authedUser
+                  :<|> removeNarrowerHandler config authedUser
                   :<|> searchHandler config authedUser
                   :<|> uploadWizardHandler authedUser)
                 :<|> staticHandler

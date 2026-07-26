@@ -13,6 +13,9 @@ module Caldron.HSPARQL
   , searchFiles
   , searchConcepts
   , getConceptsByUris
+  , getConceptDetail
+  , addBroaderConcept
+  , removeBroaderConcept
   , mintAndCreateConcept
   , updateFileGraphWithContent
   , SparqlError(..)
@@ -47,7 +50,7 @@ import Text.Mustache.Render (SubstitutionError)
 import Text.Parsec.Error (ParseError)
 import           Text.URI                        (URI, mkURI, render)
 
-import Caldron.Concept             (Concept (..))
+import Caldron.Concept             (Concept (..), ConceptDetail (..))
 import Caldron.File                (File (..), FileRevision (..))
 import RainbowHash.Logger              (writeLog)
 
@@ -465,9 +468,14 @@ allConceptsQuery = do
 
   selectVars [uri', prefLabel]
 
+lValueText :: LValue -> Text
+lValueText (PlainL t)    = t
+lValueText (PlainLL t _) = t
+lValueText (TypedL t _)  = t
+
 toConcept :: [BindingValue] -> Maybe Concept
-toConcept [Bound (UNode uriText), Bound (LNode (PlainL label))] =
-  fmap (\uri -> Concept uri label) (mkURI uriText)
+toConcept [Bound (UNode uriText), Bound (LNode lval)] =
+  fmap (\uri -> Concept uri (lValueText lval)) (mkURI uriText)
 toConcept _ = Nothing
 
 searchConcepts :: URI -> Text -> IO [Concept]
@@ -515,6 +523,75 @@ insertConceptSparql conceptUri' label =
   \  <" <> render conceptUri' <> "> rdf:type skos:Concept ;\n\
   \    skos:prefLabel \"" <> escapeSparqlLiteral label <> "\" .\n\
   \}"
+
+getConceptDetail :: URI -> URI -> IO (Maybe ConceptDetail)
+getConceptDetail sparqlEndpoint' conceptUri' = do
+  let ep = unpack (render sparqlEndpoint') <> "/query"
+  maybeLabelRows <- selectQuery ep (conceptLabelQuery conceptUri')
+  case maybeLabelRows >>= listToMaybe >>= toPrefLabel of
+    Nothing    -> pure Nothing
+    Just label -> do
+      let concept = Concept conceptUri' label
+      maybeBroaderRows  <- selectQuery ep (broaderConceptsQuery  conceptUri')
+      maybeNarrowerRows <- selectQuery ep (narrowerConceptsQuery conceptUri')
+      let broader  = maybe [] (mapMaybe toConcept) maybeBroaderRows
+          narrower = maybe [] (mapMaybe toConcept) maybeNarrowerRows
+      pure $ Just $ ConceptDetail concept broader narrower
+  where
+    toPrefLabel [Bound (LNode lval)] = Just (lValueText lval)
+    toPrefLabel _                    = Nothing
+
+conceptLabelQuery :: URI -> Query SelectQuery
+conceptLabelQuery uri' = do
+  skos      <- prefix "skos" (iriRef "http://www.w3.org/2004/02/skos/core#")
+  prefLabel <- var
+  triple_ (iriRef (render uri')) (skos .:. "prefLabel") prefLabel
+  selectVars [prefLabel]
+
+broaderConceptsQuery :: URI -> Query SelectQuery
+broaderConceptsQuery uri' = do
+  skos       <- prefix "skos" (iriRef "http://www.w3.org/2004/02/skos/core#")
+  relatedUri <- var
+  prefLabel  <- var
+  triple_ (iriRef (render uri')) (skos .:. "broader") relatedUri
+  triple_ relatedUri (skos .:. "prefLabel") prefLabel
+  selectVars [relatedUri, prefLabel]
+
+narrowerConceptsQuery :: URI -> Query SelectQuery
+narrowerConceptsQuery uri' = do
+  skos       <- prefix "skos" (iriRef "http://www.w3.org/2004/02/skos/core#")
+  relatedUri <- var
+  prefLabel  <- var
+  triple_ relatedUri (skos .:. "broader") (iriRef (render uri'))
+  triple_ relatedUri (skos .:. "prefLabel") prefLabel
+  selectVars [relatedUri, prefLabel]
+
+addBroaderConcept :: URI -> URI -> URI -> IO (Either SparqlError ())
+addBroaderConcept sparqlEndpoint' conceptUri' broaderUri' =
+  sparqlUpdateIO sparqlEndpoint' $
+    "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n\
+    \INSERT DATA { <" <> render conceptUri' <> "> skos:broader <" <> render broaderUri' <> "> . }"
+
+removeBroaderConcept :: URI -> URI -> URI -> IO (Either SparqlError ())
+removeBroaderConcept sparqlEndpoint' conceptUri' broaderUri' =
+  sparqlUpdateIO sparqlEndpoint' $
+    "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n\
+    \DELETE DATA { <" <> render conceptUri' <> "> skos:broader <" <> render broaderUri' <> "> . }"
+
+sparqlUpdateIO :: URI -> Text -> IO (Either SparqlError ())
+sparqlUpdateIO sparqlEndpoint' sparql = runExceptT $ do
+  req <- maybe (throwError $ SparqlRequestError "Could not parse SPARQL update URL") pure $
+    parseRequest ("POST " <> unpack (render sparqlEndpoint') <> "/update")
+  let req' = req
+        { requestHeaders = [("Content-Type", "application/sparql-update")]
+        , requestBody    = RequestBodyBS $ T.encodeUtf8 sparql
+        }
+  mgr  <- liftIO $ newManager defaultManagerSettings
+  resp <- liftIO $ httpLbs req' mgr
+  let status = responseStatus resp
+  unless (statusIsSuccessful status) $
+    throwError $ SparqlResponseError status
+      (T.take 100 . T.decodeUtf8 . LBS.toStrict $ responseBody resp)
 
 escapeSparqlLiteral :: Text -> Text
 escapeSparqlLiteral =
