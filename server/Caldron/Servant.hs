@@ -85,14 +85,11 @@ validateUser cache bs = do
 extractBearer :: ByteString -> Maybe T.Text
 extractBearer bs = T.decodeUtf8 <$> BS.stripPrefix "Bearer " bs
 
-resolveServiceUser :: Map.Map HeaderName ByteString -> User
+resolveServiceUser :: Map.Map HeaderName ByteString -> Handler User
 resolveServiceUser headers =
   case Map.lookup "X-Forwarded-Webid" headers >>= mkURI . T.decodeUtf8 of
-    Just uri -> User { webId = uri, name = Nothing }
-    Nothing  -> User
-      { webId = fromMaybe (panic "invalid service URI") $ mkURI "https://caldron.internal/service"
-      , name  = Just "service"
-      }
+    Just uri -> pure User { webId = uri, name = Nothing }
+    Nothing  -> throwError $ err401 { errBody = "Missing X-Forwarded-Webid header" }
 
 authHandler :: Config -> ProfileCache -> AuthHandler Request User
 authHandler config cache = mkAuthHandler handler
@@ -104,7 +101,7 @@ authHandler config cache = mkAuthHandler handler
       case Map.lookup "Authorization" headers >>= extractBearer of
         Just token ->
           if Set.member token (serviceTokens config)
-            then pure (resolveServiceUser headers)
+            then resolveServiceUser headers
             else throw401 "Invalid service token"
         Nothing ->
           case Map.lookup "X-SSL-Client-Cert" headers of
