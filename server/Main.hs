@@ -18,7 +18,7 @@ import           Caldron.Profile      (newProfileCache)
 import           Caldron.Server       (app)
 
 configToText :: Config -> Text
-configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost') =
+configToText (Config fileStoreUrl' sparqlEndpoint' webIdMap defaultHost' _serviceTokens) =
   "Configuration:\n"
   <> "  File store URL: " <> render fileStoreUrl' <> "\n"
   <> "  SPARQL Endpoint: " <> render sparqlEndpoint' <> "\n"
