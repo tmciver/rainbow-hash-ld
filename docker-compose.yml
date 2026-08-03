@@ -5,25 +5,27 @@ services:
     environment:
       - LOG_LEVEL=INFO
       - FILE_STORE_URL=http://rainbow-hash:3000/blobs
-      - SPARQL_URL=http://fuseki:3030/ds
+      - SPARQL_URL=http://caldron-fuseki:3030/ds
     volumes:
       - ./data/thumbnails:/data/thumbnails
     depends_on:
       - rainbow-hash
-      - fuseki
+      - caldron-fuseki
 
-  fuseki:
+  caldron-fuseki:
     image: atomgraph/fuseki:4.7.0
     user: root # otherwise the fuseki user does not have permissions to the mounted folder which is owner by root
+    restart: unless-stopped
     expose:
       - 3030
     volumes:
       - ./data/fuseki:/fuseki/databases
       - ./conf/fuseki/config.ttl:/fuseki/config.ttl:ro
-    command: [ "--config", "/fuseki/config.ttl" ]
+    entrypoint: ["/bin/sh", "-c", "find /fuseki/databases -name 'tdb.lock' -delete && exec ./entrypoint.sh --config /fuseki/config.ttl"]
 
   rainbow-hash:
     image: com.timmciver/rainbow-hash:latest
+    restart: unless-stopped
     command: ["--storage-dir", "/usr/local/data"]
     environment:
       - LOG_LEVEL=INFO
@@ -31,6 +33,7 @@ services:
       - ./data/rainbow-hash:/usr/local/data
 
   proxy:
+    profiles: [standalone]
     image: nginx
     ports:
       - "80:80"
