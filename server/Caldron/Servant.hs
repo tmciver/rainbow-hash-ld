@@ -13,9 +13,11 @@ module Caldron.Servant
 
 import           Protolude                        hiding (Handler)
 
+import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as LBS
 import qualified Data.ByteString.Lazy.Char8       as Char8
 import qualified Data.Map                         as Map
+import qualified Data.Set                         as Set
 import           Data.PEM                         (PEM, pemContent, pemParseLBS)
 import qualified Data.Text                        as T
 import qualified Data.Text.Encoding                    as T
@@ -30,8 +32,9 @@ import           Servant.Server.Experimental.Auth (AuthHandler, AuthServerData,
                                                    mkAuthHandler)
 import           Text.URI                         (mkURI)
 
+import Caldron.Config (Config, serviceTokens)
 import Caldron.Profile (ProfileCache)
-import Caldron.User (User)
+import Caldron.User (User(..))
 import Caldron.WebID (WebID)
 import qualified Caldron.User as User
 
@@ -79,23 +82,31 @@ validateUser cache bs = do
           Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . User.errorToText $ e) }
           Right user -> pure user
 
---- | The auth handler wraps a function from Request -> Handler WebID.
---- We look for the client certificate in the X-SSL-CERT request header.
---- The client certificate text is then passed to our `getWebid` function.
-authHandler :: ProfileCache -> AuthHandler Request User
-authHandler cache = mkAuthHandler handler
+serviceUser :: User
+serviceUser = User
+  { webId = fromMaybe (panic "invalid service URI") $ mkURI "https://caldron.internal/service"
+  , name  = Just "service"
+  }
+
+extractBearer :: ByteString -> Maybe T.Text
+extractBearer bs = T.decodeUtf8 <$> BS.stripPrefix "Bearer " bs
+
+authHandler :: Config -> ProfileCache -> AuthHandler Request User
+authHandler config cache = mkAuthHandler handler
   where
     throw401 msg = throwError $ err401 { errBody = msg }
     handler :: Request -> Handler User
-    handler req =
-      req & requestHeaders
-          & Map.fromList
-          & Map.lookup "X-SSL-Client-Cert"
-          & maybeToEither "Missing X-SSL-Client-Cert header"
-          & either throw401 (validateUser cache)
+    handler req = do
+      let headers = Map.fromList (requestHeaders req)
+      case Map.lookup "Authorization" headers >>= extractBearer of
+        Just token ->
+          if Set.member token (serviceTokens config)
+            then pure serviceUser
+            else throw401 "Invalid service token"
+        Nothing ->
+          case Map.lookup "X-SSL-Client-Cert" headers of
+            Nothing   -> throw401 "Missing X-SSL-Client-Cert header"
+            Just cert -> validateUser cache cert
 
--- | The context that will be made available to request handlers. We supply the
--- "cookie-auth"-tagged request handler defined above, so that the 'HasServer' instance
--- of 'AuthProtect' can extract the handler and run it on the request.
-genAuthServerContext :: ProfileCache -> Context (AuthHandler Request User ': '[])
-genAuthServerContext cache = authHandler cache :. EmptyContext
+genAuthServerContext :: Config -> ProfileCache -> Context (AuthHandler Request User ': '[])
+genAuthServerContext config cache = authHandler config cache :. EmptyContext

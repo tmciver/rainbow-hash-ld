@@ -502,4 +502,4 @@ server config jobQueue = (\authedUser -> homeHandler config authedUser
                 :<|> staticHandler
 
 app :: Config -> ProfileCache -> JobQueue -> Application
-app config cache jobQueue = serveWithContext api (genAuthServerContext cache) (server config jobQueue)
+app config cache jobQueue = serveWithContext api (genAuthServerContext config cache) (server config jobQueue)

@@ -23,6 +23,8 @@ import qualified System.Directory as D
 import qualified System.Environment as Env
 import           Text.URI (URI, mkURI, render)
 
+import qualified Data.Set            as Set
+
 import           Caldron.EmailAddress (EmailAddress)
 import           Caldron.Options (Options (..))
 import           RainbowHash.Logger (writeLog)
@@ -70,7 +72,9 @@ data Config = Config
   , sparqlEndpoint :: URI
   , webIdMap       :: Map EmailAddress URI
   -- If present, use the configured host over that provided in the Host header
-  , preferredHost :: Maybe Text
+  , preferredHost  :: Maybe Text
+  -- Bearer tokens accepted from trusted internal services
+  , serviceTokens  :: Set Text
   }
 
 resolveConfigFilePath :: Maybe FilePath -> IO FilePath
@@ -129,6 +133,13 @@ getSparqlEndpoint Options{sparqlEndpoint = mOptUri} mStoredConfig = do
            <|> (mStoredConfig >>= scSparqlEndpoint)
   maybe (throwError "Missing SPARQL endpoint URL. Provide with --sparql-url, SPARQL_URL env var, or in config file.") pure result
 
+getServiceTokens :: IO (Set Text)
+getServiceTokens = do
+  mVal <- Env.lookupEnv "SERVICE_TOKENS"
+  pure $ case mVal of
+    Nothing  -> Set.empty
+    Just val -> Set.fromList . filter (not . T.null) . T.splitOn "," . T.pack $ val
+
 getConfig
   :: ( MonadIO m
      , MonadError Text m
@@ -138,11 +149,13 @@ getConfig
 getConfig opts = do
   configPath <- liftIO $ resolveConfigFilePath (configFile opts)
   mStoredConfig <- readStoredConfig configPath
+  tokens <- liftIO getServiceTokens
   Config
     <$> getBlobStoreUrl opts mStoredConfig
     <*> getSparqlEndpoint opts mStoredConfig
     <*> pure (maybe Map.empty scWebIdMap mStoredConfig)
     <*> pure (defaultHost opts <|> (mStoredConfig >>= scPreferredHost))
+    <*> pure tokens
 
 writeStoredConfigToFile :: FilePath -> StoredConfig -> IO ()
 writeStoredConfigToFile configFilePath config = do

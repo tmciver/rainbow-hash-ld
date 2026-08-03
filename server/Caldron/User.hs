@@ -5,7 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Caldron.User
-  ( User
+  ( User(..)
   , UserError(..)
   , userWebId
   , userName
