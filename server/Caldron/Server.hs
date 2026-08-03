@@ -236,7 +236,8 @@ filesHandler
   -> MultipartData Tmp
   -> Handler NoContent
 filesHandler config jobQueue user mAccept mHost mFrom multipartData = do
-  case (files multipartData, mHost) of
+  let effectiveHost = preferredHost config <|> mHost
+  case (files multipartData, effectiveHost) of
     ([fileData], Just host) -> uploadFile host mFrom fileData (inputs multipartData)
     (_, Nothing) -> throwError (err400 { errBody = "HOST header not set. Consider configuring one using the `default-host` configuration option." })
     _ -> throwError (err400 { errBody = "Must supply data for a single file for upload." })
