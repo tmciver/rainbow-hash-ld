@@ -140,6 +140,11 @@ getServiceTokens = do
     Nothing  -> Set.empty
     Just val -> Set.fromList . filter (not . T.null) . T.splitOn "," . T.pack $ val
 
+getPreferredHost :: Options -> Maybe StoredConfig -> IO (Maybe Text)
+getPreferredHost opts mStoredConfig = do
+  mEnv <- fmap T.pack <$> Env.lookupEnv "DEFAULT_HOST"
+  pure $ defaultHost opts <|> mEnv <|> (mStoredConfig >>= scPreferredHost)
+
 getConfig
   :: ( MonadIO m
      , MonadError Text m
@@ -150,11 +155,12 @@ getConfig opts = do
   configPath <- liftIO $ resolveConfigFilePath (configFile opts)
   mStoredConfig <- readStoredConfig configPath
   tokens <- liftIO getServiceTokens
+  preferredHost' <- liftIO $ getPreferredHost opts mStoredConfig
   Config
     <$> getBlobStoreUrl opts mStoredConfig
     <*> getSparqlEndpoint opts mStoredConfig
     <*> pure (maybe Map.empty scWebIdMap mStoredConfig)
-    <*> pure (defaultHost opts <|> (mStoredConfig >>= scPreferredHost))
+    <*> pure preferredHost'
     <*> pure tokens
 
 writeStoredConfigToFile :: FilePath -> StoredConfig -> IO ()

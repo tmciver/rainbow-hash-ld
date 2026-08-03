@@ -23,7 +23,6 @@ import           Network.HTTP.ReverseProxy (ProxyDest (..), WaiProxyResponse (..
 import           Network.HTTP.Types     (status200, status400, status404, status500)
 import           System.Directory       (copyFile, removeFile)
 import           System.IO              (openTempFile, hClose)
-import           System.IO.Temp         (withSystemTempFile)
 import           Network.Wai            (responseLBS, rawPathInfo, pathInfo, rawQueryString, queryString)
 import           Servant                hiding (URI)
 import           Servant.Multipart hiding (lookupFile)
@@ -113,15 +112,6 @@ type FilesAPI =
     :<|> "concepts" :> Header "Host" Text :> Capture "conceptId" Text :> "narrower" :> Capture "relatedId" Text               :> DeleteNoContent
     :<|> "search"   :> QueryParam "q" Text :> Get '[HTML] SearchResults
     :<|> "upload"   :> "wizard"            :> Get '[HTML] UploadWizard
-    :<|> "api" :> "documents"
-          :> Header "Host" Text
-          :> Header "X-Title" Text
-          :> ReqBody '[OctetStream] LBS.ByteString
-          :> Post '[PlainText] Text
-    :<|> "api" :> "documents" :> Capture "fileId" Text
-          :> Header "Host" Text
-          :> ReqBody '[OctetStream] LBS.ByteString
-          :> PutNoContent
   )
   :<|> "static" :> Raw
 
@@ -283,31 +273,36 @@ filesHandler config jobQueue user mAccept mHost mFrom multipartData = do
             pure uris
 
           let allSubjects = subjects <> newConceptUris
-
-          -- Copy the multipart temp file to a path that outlives this handler
-          stagingPath <- liftIO $ do
-            (path, h) <- openTempFile "/tmp" "caldron-upload-"
-            hClose h
-            copyFile srcPath path
-            pure path
-
-          -- Build the job action
-          let jobAction = do
-                result <- runApp
-                  (putFile stagingPath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption)
-                  config
-                removeFile stagingPath
-                pure $ case result of
-                  Left appErr          -> Left (appErrorToString appErr)
-                  Right (Left fileErr) -> Left (fileErrorToText fileErr)
-                  Right (Right uri)    -> Right uri
-
-          jobId <- liftIO $ submitJob jobQueue jobAction
-          let jobUrl = "/jobs/" <> jobId
               isBrowser = maybe False (T.isInfixOf "text/html") mAccept
+
           if isBrowser
-            then throwError err303 { errHeaders = [("Location", "/")] }
-            else throwError $ ServerError 202 "Accepted" "" [("Location", T.encodeUtf8 jobUrl)]
+            then do
+              -- Copy the multipart temp file to a path that outlives this handler
+              stagingPath <- liftIO $ do
+                (path, h) <- openTempFile "/tmp" "caldron-upload-"
+                hClose h
+                copyFile srcPath path
+                pure path
+              let jobAction = do
+                    result <- runApp
+                      (putFile stagingPath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption)
+                      config
+                    removeFile stagingPath
+                    pure $ case result of
+                      Left appErr          -> Left (appErrorToString appErr)
+                      Right (Left fileErr) -> Left (fileErrorToText fileErr)
+                      Right (Right uri)    -> Right uri
+              _ <- liftIO $ submitJob jobQueue jobAction
+              throwError err303 { errHeaders = [("Location", "/")] }
+            else do
+              -- Process synchronously; temp file is still alive within the handler
+              result <- liftIO $ runApp
+                (putFile srcPath host' (userWebId user) mAuthorUri maybeFileName maybeTitle maybeDesc allSubjects maybeMT fileNodeCreateOption)
+                config
+              case result of
+                Left appErr           -> throwError $ err500 { errBody = errToLBS appErr }
+                Right (Left fileErr)  -> throwError $ err400 { errBody = LBS.fromStrict . encodeUtf8 . fileErrorToText $ fileErr }
+                Right (Right fileUri) -> throwError $ ServerError 201 "Created" "" [("Location", T.encodeUtf8 $ render fileUri)]
 
         getTitle :: [Input] -> Maybe Text
         getTitle = (<&> iValue) . find isTitle
@@ -484,33 +479,6 @@ searchHandler config user mQ = do
 staticHandler :: Server Raw
 staticHandler = serveDirectoryWebApp "static"
 
-createDocumentHandler :: Config -> User -> Maybe Text -> Maybe Text -> LBS.ByteString -> Handler Text
-createDocumentHandler config user mHost mTitle bodyBytes = do
-  let host = fromMaybe "example.com" $ preferredHost config <|> mHost
-  eitherResult <- liftIO $ withSystemTempFile "caldron-doc-.html" $ \fp h -> do
-    LBS.hPut h bodyBytes
-    hClose h
-    runApp (putFile fp host (userWebId user) Nothing Nothing mTitle Nothing [] Nothing AlwaysCreate) config
-  case eitherResult of
-    Left appErr           -> throwError $ err500 { errBody = errToLBS appErr }
-    Right (Left fileErr)  -> throwError $ err400 { errBody = LBS.fromStrict . encodeUtf8 . fileErrorToText $ fileErr }
-    Right (Right fileUri) -> pure $ render fileUri <> "/content"
-
-updateDocumentHandler :: Config -> User -> Text -> Maybe Text -> LBS.ByteString -> Handler NoContent
-updateDocumentHandler config user fileId mHost bodyBytes = do
-  let host   = fromMaybe "example.com" $ preferredHost config <|> mHost
-      uriTxt = "https://" <> host <> "/file/" <> fileId
-  case mkURI uriTxt of
-    Nothing      -> throwError $ err400 { errBody = "Could not construct a valid file URI." }
-    Just fileUri -> do
-      eitherResult <- liftIO $ withSystemTempFile "caldron-doc-.html" $ \fp h -> do
-        LBS.hPut h bodyBytes
-        hClose h
-        runApp (App.updateFileContent host fileUri fp (userWebId user) Nothing Nothing) config
-      case eitherResult of
-        Left appErr -> throwError $ err500 { errBody = errToLBS appErr }
-        Right ()    -> pure NoContent
-
 server :: Config -> JobQueue -> Server FilesAPI
 server config jobQueue = (\authedUser -> homeHandler config authedUser
                   :<|> filesHandler config jobQueue authedUser
@@ -534,9 +502,7 @@ server config jobQueue = (\authedUser -> homeHandler config authedUser
                   :<|> addNarrowerHandler  config authedUser
                   :<|> removeNarrowerHandler config authedUser
                   :<|> searchHandler config authedUser
-                  :<|> uploadWizardHandler authedUser
-                  :<|> createDocumentHandler config authedUser
-                  :<|> updateDocumentHandler config authedUser)
+                  :<|> uploadWizardHandler authedUser)
                 :<|> staticHandler
 
 app :: Config -> ProfileCache -> JobQueue -> Application
