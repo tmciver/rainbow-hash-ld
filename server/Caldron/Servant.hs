@@ -22,7 +22,7 @@ import           Data.PEM                         (PEM, pemContent, pemParseLBS)
 import qualified Data.Text                        as T
 import qualified Data.Text.Encoding                    as T
 import qualified Data.X509                        as X509
-import           Network.HTTP.Types               (urlDecode)
+import           Network.HTTP.Types               (HeaderName, urlDecode)
 import           Network.Wai                      (Request, requestHeaders)
 import           Servant                          (Handler)
 import           Servant.API.Experimental.Auth    (AuthProtect)
@@ -82,14 +82,17 @@ validateUser cache bs = do
           Left e -> throwError $ err401 { errBody = "Client certificate validation failed: " <> (LBS.fromStrict . T.encodeUtf8 . User.errorToText $ e) }
           Right user -> pure user
 
-serviceUser :: User
-serviceUser = User
-  { webId = fromMaybe (panic "invalid service URI") $ mkURI "https://caldron.internal/service"
-  , name  = Just "service"
-  }
-
 extractBearer :: ByteString -> Maybe T.Text
 extractBearer bs = T.decodeUtf8 <$> BS.stripPrefix "Bearer " bs
+
+resolveServiceUser :: Map.Map HeaderName ByteString -> User
+resolveServiceUser headers =
+  case Map.lookup "X-Forwarded-Webid" headers >>= mkURI . T.decodeUtf8 of
+    Just uri -> User { webId = uri, name = Nothing }
+    Nothing  -> User
+      { webId = fromMaybe (panic "invalid service URI") $ mkURI "https://caldron.internal/service"
+      , name  = Just "service"
+      }
 
 authHandler :: Config -> ProfileCache -> AuthHandler Request User
 authHandler config cache = mkAuthHandler handler
@@ -101,7 +104,7 @@ authHandler config cache = mkAuthHandler handler
       case Map.lookup "Authorization" headers >>= extractBearer of
         Just token ->
           if Set.member token (serviceTokens config)
-            then pure serviceUser
+            then pure (resolveServiceUser headers)
             else throw401 "Invalid service token"
         Nothing ->
           case Map.lookup "X-SSL-Client-Cert" headers of
