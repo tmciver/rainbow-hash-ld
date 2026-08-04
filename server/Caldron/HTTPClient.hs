@@ -42,7 +42,7 @@ import           Network.HTTP.Client.MultipartFormData (formDataBody,
 import           Network.HTTP.Types                    (Header, Status,
                                                         hLocation,
                                                         statusIsSuccessful)
-import           System.IO                             (hClose)
+import           System.IO                             (hClose, hSetEncoding, utf8)
 import           System.IO.Temp                        (withSystemTempFile)
 import           Text.URI                              (URI, mkURI, render)
 
@@ -184,6 +184,7 @@ postToSPARQL gspUri graph = do
         postFileToSPARQL fp h = do
 
           -- write the rdf turtle to the temp file handle
+          liftIO $ hSetEncoding h utf8
           let turtleSerializer = TurtleSerializer Nothing mempty
           liftIO $ hWriteRdf turtleSerializer h graph
 

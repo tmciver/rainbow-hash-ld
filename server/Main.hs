@@ -6,7 +6,7 @@ module Main where
 
 import           Protolude
 
-import           System.IO                (hSetBuffering, BufferMode (LineBuffering))
+import           System.IO                (hSetBuffering, hSetEncoding, BufferMode (LineBuffering), utf8)
 import           Network.Wai.Handler.Warp (run)
 import           Options.Applicative      (execParser)
 import           Text.URI                 (render)
@@ -29,6 +29,8 @@ main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   hSetBuffering stderr LineBuffering
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
   opts <- execParser optionsParserInfo
   eitherConfig <- runExceptT $ getConfig opts
   let port' = fromIntegral $ port opts
