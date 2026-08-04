@@ -1,7 +1,7 @@
 let
   pkgs = import (import ./nixpkgs.nix) { config = { allowBroken = true; }; };
   caldron = pkgs.haskell.lib.justStaticExecutables
-    (import ./default.nix { inherit pkgs; });
+    (import ./default.nix { inherit pkgs; returnShellEnv = false; });
 in
 pkgs.dockerTools.buildLayeredImage {
   name = "com.timmciver/caldron";

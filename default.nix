@@ -1,6 +1,9 @@
-{ pkgs ? import (import ./nixpkgs.nix) { config = { allowBroken = true; }; } }:
+{ pkgs ? import (import ./nixpkgs.nix) { config = { allowBroken = true; }; }
+, returnShellEnv ? pkgs.lib.inNixShell
+}:
 pkgs.haskellPackages.developPackage {
   root = ./.;
+  inherit returnShellEnv;
 
   source-overrides = {
     rainbow-hash = pkgs.fetchFromGitHub {
