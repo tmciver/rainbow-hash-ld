@@ -1,0 +1,42 @@
+# Production overlay for caldron.propellar.app
+# Deploy with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Requires the propellar-proxy and propellar-services external networks,
+# created by propellar-infra's docker-compose.yml.
+
+services:
+  caldron:
+    image: registry.gitlab.com/tmciver/caldron:latest
+    environment:
+      - SERVICE_TOKENS=${CALDRON_TOKEN}
+      - DEFAULT_HOST=caldron.propellar.app
+    networks:
+      propellar-services:
+        aliases:
+          - caldron
+
+  proxy:
+    profiles: []  # always active in production (overrides the standalone profile)
+    image: nginx
+    volumes:
+      - ./conf/http/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html/static:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=propellar-proxy"
+      - "traefik.http.routers.caldron.rule=Host(`caldron.propellar.app`)"
+      - "traefik.http.routers.caldron.entrypoints=websecure"
+      - "traefik.http.routers.caldron.tls.certresolver=le"
+      - "traefik.http.routers.caldron.tls.options=clientCertOptional@file"
+      - "traefik.http.routers.caldron.middlewares=passcert@docker"
+      - "traefik.http.services.caldron-svc.loadbalancer.server.port=80"
+    networks:
+      - propellar-proxy
+
+networks:
+  propellar-proxy:
+    external: true
+    name: propellar-proxy
+  propellar-services:
+    external: true
+    name: propellar-services
