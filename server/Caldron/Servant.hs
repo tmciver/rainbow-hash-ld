@@ -104,8 +104,10 @@ authHandler config cache = mkAuthHandler handler
             then resolveServiceUser headers
             else throw401 "Invalid service token"
         Nothing ->
-          case Map.lookup "X-SSL-Client-Cert" headers of
-            Nothing   -> throw401 "Missing X-SSL-Client-Cert header"
+          -- nginx sends X-SSL-Client-Cert; Traefik sends X-Forwarded-Tls-Client-Cert.
+          case Map.lookup "X-Forwarded-Tls-Client-Cert" headers
+            <|> Map.lookup "X-SSL-Client-Cert" headers of
+            Nothing   -> throw401 "Missing client certificate header"
             Just cert -> validateUser cache cert
 
 genAuthServerContext :: Config -> ProfileCache -> Context (AuthHandler Request User ': '[])
