@@ -7,6 +7,7 @@ variables:
 
 build:
   stage: build
+  tags: [nix]
   script:
     - nix-build docker.nix
     - docker load < result
@@ -20,6 +21,7 @@ build:
 
 deploy:
   stage: deploy
+  tags: [deploy]
   needs: [build]
   script:
     - git -C /opt/propellar/caldron pull --ff-only
