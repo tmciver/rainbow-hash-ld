@@ -4,6 +4,7 @@ stages:
 
 variables:
   LOCAL_IMAGE: com.timmciver/caldron
+  INFRA: /opt/propellar/propellar-infra
 
 build:
   stage: build
@@ -24,9 +25,16 @@ deploy:
   tags: [deploy]
   needs: [build]
   script:
-    - git -C /opt/propellar/caldron pull --ff-only
-    - cd /opt/propellar/caldron
-    - docker compose -f docker-compose.yml -f docker-compose.prod.yml pull caldron proxy
-    - docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d caldron proxy
+    - git -C $INFRA pull --ff-only
+    - sed -i "s|registry.gitlab.com/tmciver/caldron:.*|registry.gitlab.com/tmciver/caldron:${CI_COMMIT_SHA}|" $INFRA/docker-compose.yml
+    - |
+      git -C $INFRA diff --quiet docker-compose.yml || \
+        git -C $INFRA -c user.email="ci@propellar.app" -c user.name="GitLab CI" \
+          commit -m "Deploy caldron ${CI_COMMIT_SHA}" docker-compose.yml
+    - git -C $INFRA push
+    - mkdir -p $INFRA/static/caldron
+    - cp /opt/propellar/caldron/static/* $INFRA/static/caldron/
+    - docker compose -f $INFRA/docker-compose.yml pull caldron caldron-proxy
+    - docker compose -f $INFRA/docker-compose.yml up -d --force-recreate caldron caldron-proxy
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
